@@ -383,6 +383,8 @@ function renderBuilder(data) {
             ${allDecks.map(d => `<option value="${d.id}" ${d.id === deck.id ? 'selected' : ''}>${d.name}</option>`).join('')}
           </select>
           <button class="btn btn--primary btn--sm" onclick="createNewDeck()">+ New Deck</button>
+          <button class="btn btn--outline btn--sm" onclick="document.getElementById('import-file-input').click()">Import .txt</button>
+          <input type="file" id="import-file-input" accept=".txt,.dec,.dek" style="display:none" onchange="importFromFile(this)">
         </div>
       </div>
 
@@ -881,7 +883,11 @@ function renderCollection() {
   container.innerHTML = `
     <div class="collection-header">
       <h1>My Decks</h1>
-      <button class="btn btn--primary btn--sm" onclick="createNewDeckFromCollection()">+ New Deck</button>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn--primary btn--sm" onclick="createNewDeckFromCollection()">+ New Deck</button>
+        <button class="btn btn--outline btn--sm" onclick="document.getElementById('import-file-collection').click()">Import .txt</button>
+        <input type="file" id="import-file-collection" accept=".txt,.dec,.dek" style="display:none" onchange="importFromFile(this)">
+      </div>
     </div>
 
     <div class="decks-grid">
@@ -945,4 +951,164 @@ function exportDeck(deckId) {
   a.download = `${deck.name.replace(/[^a-z0-9]/gi, '_')}.txt`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  IMPORT FROM .TXT FILE
+// ═══════════════════════════════════════════════════════════
+function importFromFile(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const text = e.target.result;
+    const deckName = file.name.replace(/\.\w+$/, '').replace(/[_-]/g, ' ');
+    importDeckFromText(text, deckName);
+  };
+  reader.readAsText(file);
+  input.value = ''; // reset so same file can be re-imported
+}
+
+async function importDeckFromText(text, deckName) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+
+  // Parse lines: "qty name" or "qty x name" — skip comments and blank lines
+  let mainCards = [];
+  let sideboardCards = [];
+  let inSideboard = false;
+  let hasCommander = false;
+  let commanderName = null;
+
+  for (const line of lines) {
+    // Skip comments
+    if (line.startsWith('//') || line.startsWith('#')) {
+      if (/sideboard/i.test(line)) inSideboard = true;
+      if (/commander/i.test(line)) hasCommander = true;
+      continue;
+    }
+    // Skip empty or section headers like "Deck" or "Sideboard"
+    if (/^(deck|mainboard|main\s*deck)$/i.test(line)) { inSideboard = false; continue; }
+    if (/^(sideboard|side\s*board|side)$/i.test(line)) { inSideboard = true; continue; }
+
+    // Parse "qty name" or "qtyx name"
+    const match = line.match(/^(\d+)\s*x?\s+(.+)$/i);
+    if (!match) continue;
+
+    const qty = parseInt(match[1], 10);
+    const name = match[2].trim();
+    if (!name || qty < 1) continue;
+
+    const entry = { name, qty };
+    if (inSideboard) {
+      sideboardCards.push(entry);
+    } else {
+      mainCards.push(entry);
+    }
+  }
+
+  if (mainCards.length === 0 && sideboardCards.length === 0) {
+    alert('No cards found in the file. Expected format:\n1 Card Name\n2 Another Card');
+    return;
+  }
+
+  // Detect format from card count (100 cards = commander, 60 = standard/modern/pioneer)
+  const totalMain = mainCards.reduce((s, c) => s + c.qty, 0);
+  const format = totalMain >= 99 ? 'commander' : 'standard';
+
+  // Create the deck
+  const deck = Storage.createDeck(deckName || 'Imported Deck', format);
+
+  // Show progress modal
+  const modal = document.getElementById('card-detail-modal');
+  const title = document.getElementById('card-detail-title');
+  const body = document.getElementById('card-detail-body');
+  modal.style.display = 'flex';
+  title.textContent = `Importing "${deckName}"`;
+
+  const allCards = [
+    ...mainCards.map(c => ({ ...c, zone: 'cards' })),
+    ...sideboardCards.map(c => ({ ...c, zone: 'sideboard' })),
+  ];
+  const total = allCards.length;
+  let loaded = 0;
+  let failed = [];
+
+  body.innerHTML = `
+    <div style="text-align:center;padding:20px">
+      <p style="color:var(--color-heading);font-size:1rem;font-weight:700;margin-bottom:8px">Fetching card data from Scryfall...</p>
+      <p style="color:var(--color-text-muted);font-size:.85rem" id="import-progress">0 / ${total} cards</p>
+      <div style="background:var(--color-border);border-radius:4px;height:6px;margin-top:16px;overflow:hidden">
+        <div id="import-progress-bar" style="background:var(--color-accent);height:100%;width:0%;transition:width .2s;border-radius:4px"></div>
+      </div>
+    </div>
+  `;
+
+  // Fetch cards from Scryfall in batches (respect rate limit)
+  for (const entry of allCards) {
+    try {
+      const card = await Scryfall.getByFuzzyName(entry.name);
+      const cardData = {
+        name: card.name,
+        qty: entry.qty,
+        scryfallId: card.id,
+        manaCost: card.mana_cost || (card.card_faces?.[0]?.mana_cost) || '',
+        typeLine: card.type_line || '',
+        price: Scryfall.getPrice(card),
+        imageUrl: Scryfall.getSmallImage(card),
+        colors: card.colors || card.color_identity || [],
+        cmc: card.cmc || 0,
+      };
+      deck[entry.zone].push(cardData);
+    } catch (err) {
+      failed.push(entry.name);
+      // Still add the card with minimal data so it shows up
+      deck[entry.zone].push({
+        name: entry.name,
+        qty: entry.qty,
+        scryfallId: '',
+        manaCost: '',
+        typeLine: '',
+        price: null,
+        imageUrl: '',
+        colors: [],
+        cmc: 0,
+      });
+    }
+    loaded++;
+    const pct = Math.round((loaded / total) * 100);
+    const progressEl = document.getElementById('import-progress');
+    const barEl = document.getElementById('import-progress-bar');
+    if (progressEl) progressEl.textContent = `${loaded} / ${total} cards`;
+    if (barEl) barEl.style.width = `${pct}%`;
+  }
+
+  deck.updatedAt = new Date().toISOString();
+  Storage.saveDeck(deck);
+  currentDeckId = deck.id;
+
+  // Show completion
+  body.innerHTML = `
+    <div style="text-align:center;padding:20px">
+      <div style="font-size:2.5rem;margin-bottom:12px">${failed.length === 0 ? '&#10003;' : '&#9888;'}</div>
+      <p style="color:var(--color-heading);font-size:1.1rem;font-weight:700;margin-bottom:8px">
+        ${failed.length === 0 ? 'Import Complete!' : 'Import Complete (with warnings)'}
+      </p>
+      <p style="color:var(--color-text-muted);font-size:.85rem;margin-bottom:4px">
+        <strong>${deck.cards.length}</strong> mainboard cards, <strong>${deck.sideboard.length}</strong> sideboard cards
+      </p>
+      <p style="color:var(--color-text-muted);font-size:.85rem;margin-bottom:4px">
+        Total: <strong>${totalMain + sideboardCards.reduce((s, c) => s + c.qty, 0)}</strong> cards &mdash; Format: <strong>${format}</strong>
+      </p>
+      <p style="color:var(--color-accent);font-size:1rem;font-weight:700;margin-bottom:16px">
+        $${Storage.getDeckTotalPrice(deck).toFixed(2)} estimated value
+      </p>
+      ${failed.length > 0 ? `
+        <div style="text-align:left;background:var(--color-bg);border:1px solid #cf6b6b4d;border-radius:var(--radius-sm);padding:12px;margin-bottom:16px">
+          <p style="color:#cf6b6b;font-size:.82rem;font-weight:600;margin-bottom:6px">${failed.length} card(s) not found on Scryfall:</p>
+          <p style="color:var(--color-text-muted);font-size:.78rem">${failed.join(', ')}</p>
+        </div>
+      ` : ''}
+      <button class="btn btn--primary btn--sm" onclick="closeCardDetail(); navigate('builder', { deckId: '${deck.id}' });">Open Deck</button>
+    </div>
+  `;
 }
