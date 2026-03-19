@@ -148,11 +148,30 @@ const Storage = (() => {
     return { have, missing };
   }
 
+  // ── Backup & Restore ────────────────────────────────────
+  function exportAll() {
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      decks: getDecks(),
+      ownedCards: [...getOwnedCards()],
+      settings: getSettings(),
+    };
+  }
+
+  function importAll(data) {
+    if (!data || data.version !== 1) throw new Error('Invalid backup file');
+    if (data.decks) saveDecks(data.decks);
+    if (data.ownedCards) saveOwnedCards(new Set(data.ownedCards));
+    if (data.settings) saveSettings(data.settings);
+  }
+
   return {
     getDecks, saveDecks, getDeck, saveDeck, deleteDeck, createDeck,
     addCardToDeck, removeCardFromDeck,
     getDeckTotalCards, getDeckTotalPrice,
     getSettings, saveSettings,
     getOwnedCards, saveOwnedCards, isCardOwned, toggleCardOwned, setCardOwned, getDeckOwnedCount,
+    exportAll, importAll,
   };
 })();

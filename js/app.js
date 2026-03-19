@@ -1256,3 +1256,44 @@ async function importDeckFromText(text, deckName) {
     </div>
   `;
 }
+
+// ═══════════════════════════════════════════════════════════
+//  BACKUP & RESTORE
+// ═══════════════════════════════════════════════════════════
+function backupAllData() {
+  const data = Storage.exportAll();
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const date = new Date().toISOString().slice(0, 10);
+  a.download = `mtg-deck-builder-backup-${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function restoreAllData(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!confirm(`Restore backup from ${data.exportedAt || 'unknown date'}?\n\nThis contains ${(data.decks || []).length} deck(s) and ${(data.ownedCards || []).length} owned card(s).\n\nThis will REPLACE all current data.`)) return;
+      Storage.importAll(data);
+      // Apply restored theme
+      const settings = Storage.getSettings();
+      if (settings.theme) {
+        document.documentElement.setAttribute('data-theme', settings.theme);
+        updateThemeIcon(settings.theme);
+      }
+      navigate(currentPage);
+      alert('Backup restored successfully!');
+    } catch (err) {
+      alert('Invalid backup file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
