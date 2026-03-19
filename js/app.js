@@ -448,6 +448,7 @@ function renderBuilder(data) {
 
         <!-- Deck Panel -->
         <div class="builder__deck-panel">
+          <input id="deck-filter-input" class="builder__search-input" type="text" placeholder="Filter deck list by card name..." autocomplete="off" oninput="filterDeckList(this.value)" style="margin-bottom:12px">
           <div class="deck-sections">
             ${totalCards === 0 ? `
               <div class="deck-section">
@@ -521,6 +522,28 @@ function renderDeckCard(card, deckId, zone) {
 function toggleOwned(cardName, deckId) {
   Storage.toggleCardOwned(cardName);
   renderBuilder({ deckId });
+  // Restore filter text after re-render
+  const filterInput = document.getElementById('deck-filter-input');
+  if (filterInput && window._lastDeckFilter) {
+    filterInput.value = window._lastDeckFilter;
+    filterDeckList(window._lastDeckFilter);
+  }
+}
+
+function filterDeckList(query) {
+  window._lastDeckFilter = query;
+  const q = query.toLowerCase().trim();
+  document.querySelectorAll('.deck-sections .deck-card').forEach(card => {
+    const name = card.querySelector('.deck-card__name')?.textContent?.toLowerCase() || '';
+    card.style.display = !q || name.includes(q) ? '' : 'none';
+  });
+  // Hide empty sections, show sections with matches
+  document.querySelectorAll('.deck-sections .deck-section').forEach(section => {
+    const cards = section.querySelectorAll('.deck-card');
+    if (cards.length === 0) return; // sideboard empty state or empty deck
+    const hasVisible = [...cards].some(c => c.style.display !== 'none');
+    section.style.display = hasVisible || !q ? '' : 'none';
+  });
 }
 
 let currentTypeFilter = '';
