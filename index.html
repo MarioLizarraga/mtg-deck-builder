@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MTG Deck Builder</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🃏</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="admin">
+    <!-- Sidebar -->
+    <aside class="admin__sidebar">
+      <a href="#" class="admin__brand" onclick="navigate('dashboard'); return false;">MTG Builder</a>
+
+      <button class="admin__search-trigger" onclick="openSearch()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span>Search Cards</span>
+        <kbd>Ctrl+K</kbd>
+      </button>
+
+      <nav class="admin__nav">
+        <a href="#" class="admin__link active" data-page="dashboard" onclick="navigate('dashboard'); return false;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Dashboard
+        </a>
+        <a href="#" class="admin__link" data-page="builder" onclick="navigate('builder'); return false;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          Deck Builder
+        </a>
+        <a href="#" class="admin__link" data-page="meta" onclick="navigate('meta'); return false;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+          Meta Decks
+        </a>
+        <a href="#" class="admin__link" data-page="compare" onclick="navigate('compare'); return false;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Compare
+        </a>
+        <a href="#" class="admin__link" data-page="collection" onclick="navigate('collection'); return false;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          Collection
+        </a>
+      </nav>
+
+      <div class="admin__bottom">
+        <button onclick="toggleTheme()" class="admin__theme-btn" title="Toggle theme">
+          <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg id="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="display:none"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+          <span id="theme-label">Light</span>
+        </button>
+
+        <div class="admin__user">
+          <div class="admin__user-info">
+            <span class="admin__user-name">Planeswalker</span>
+            <span class="admin__user-role">Deck Master</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="admin__content">
+      <!-- Dashboard View -->
+      <div id="view-dashboard" class="view"></div>
+
+      <!-- Deck Builder View -->
+      <div id="view-builder" class="view" style="display:none"></div>
+
+      <!-- Meta Decks View -->
+      <div id="view-meta" class="view" style="display:none"></div>
+
+      <!-- Compare View -->
+      <div id="view-compare" class="view" style="display:none"></div>
+
+      <!-- Collection View -->
+      <div id="view-collection" class="view" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- Global Card Search Modal -->
+  <div id="card-search-modal" class="gsearch-overlay" style="display:none" onclick="if(event.target===this)closeSearch()">
+    <div class="gsearch">
+      <div class="gsearch__input-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="global-search-input" class="gsearch__input" type="text" placeholder="Search any MTG card..." autocomplete="off">
+        <kbd class="gsearch__kbd">ESC</kbd>
+      </div>
+      <div id="global-search-results" class="gsearch__results"></div>
+    </div>
+  </div>
+
+  <!-- Card Detail Modal -->
+  <div id="card-detail-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeCardDetail()">
+    <div class="modal" style="max-width:720px">
+      <div class="modal__header">
+        <h2 id="card-detail-title">Card Name</h2>
+        <button class="modal__close" onclick="closeCardDetail()">&times;</button>
+      </div>
+      <div class="modal__body" id="card-detail-body"></div>
+    </div>
+  </div>
+
+  <script src="js/storage.js"></script>
+  <script src="js/scryfall.js"></script>
+  <script src="js/meta-decks.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
