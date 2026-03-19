@@ -370,7 +370,7 @@ function renderBuilder(data) {
     categories[cat].push(card);
   });
 
-  const categoryOrder = ['Creatures', 'Instants', 'Sorceries', 'Planeswalkers', 'Enchantments', 'Artifacts', 'Lands', 'Other'];
+  const categoryOrder = ['Creatures', 'Planeswalkers', 'Battles', 'Instants', 'Sorceries', 'Enchantments', 'Artifacts', 'Lands', 'Other'];
 
   // All decks for switcher
   const allDecks = Storage.getDecks();
@@ -458,17 +458,22 @@ function renderBuilder(data) {
                 </div>
               </div>
             ` : ''}
-            ${categoryOrder.filter(cat => categories[cat]).map(cat => `
-              <div class="deck-section">
+            ${categoryOrder.filter(cat => categories[cat]).map(cat => {
+              const catColors = { Creatures:'#6bcf8e', Planeswalkers:'#e0c992', Battles:'#cf6b6b', Instants:'#6cabcf', Sorceries:'#b06ccf', Enchantments:'#c9a86c', Artifacts:'#8899aa', Lands:'#8B7355', Other:'#6b6b80' };
+              const catIcons = { Creatures:'&#x1F43E;', Planeswalkers:'&#x2726;', Battles:'&#x2694;', Instants:'&#x26A1;', Sorceries:'&#x2728;', Enchantments:'&#x2B50;', Artifacts:'&#x2699;', Lands:'&#x26F0;', Other:'&#x2756;' };
+              const cc = catColors[cat] || '#6b6b80';
+              const ci = catIcons[cat] || '';
+              return `
+              <div class="deck-section" style="border-left:3px solid ${cc}">
                 <div class="deck-section__header" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? '' : 'none'">
-                  <h3>${cat}</h3>
-                  <span class="deck-section__count">${categories[cat].reduce((s, c) => s + (c.qty || 1), 0)}</span>
+                  <h3><span style="margin-right:6px">${ci}</span>${cat}</h3>
+                  <span class="deck-section__count" style="color:${cc}">${categories[cat].reduce((s, c) => s + (c.qty || 1), 0)}</span>
                 </div>
                 <div class="deck-section__body" ondragover="event.preventDefault(); this.classList.add('deck-section__body--drop-target')" ondragleave="this.classList.remove('deck-section__body--drop-target')" ondrop="handleDeckDrop(event, '${deck.id}'); this.classList.remove('deck-section__body--drop-target')">
                   ${categories[cat].map(card => renderDeckCard(card, deck.id, 'cards')).join('')}
                 </div>
-              </div>
-            `).join('')}
+              </div>`;
+            }).join('')}
 
             <!-- Sideboard -->
             <div class="deck-section">

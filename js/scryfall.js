@@ -93,11 +93,12 @@ const Scryfall = (() => {
 
   // Get card type category for deck sections
   function getCategory(card) {
-    const typeLine = (card.type_line || '').toLowerCase();
+    const typeLine = (card.type_line || card.typeLine || '').toLowerCase();
     if (typeLine.includes('creature')) return 'Creatures';
+    if (typeLine.includes('planeswalker')) return 'Planeswalkers';
+    if (typeLine.includes('battle')) return 'Battles';
     if (typeLine.includes('instant')) return 'Instants';
     if (typeLine.includes('sorcery')) return 'Sorceries';
-    if (typeLine.includes('planeswalker')) return 'Planeswalkers';
     if (typeLine.includes('enchantment')) return 'Enchantments';
     if (typeLine.includes('artifact')) return 'Artifacts';
     if (typeLine.includes('land')) return 'Lands';
