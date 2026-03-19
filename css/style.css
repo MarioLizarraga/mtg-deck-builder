@@ -881,6 +881,30 @@ a:hover { color: var(--color-accent-light); }
   border-radius: var(--radius-md);
   flex-wrap: wrap;
 }
+.collection-search__card--missing {
+  border-left: 3px solid #cf6b6b;
+}
+.collection-search__owned {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .8rem;
+  color: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition);
+}
+.collection-search__owned:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.collection-search__owned.owned {
+  background: #6bcf8e;
+  border-color: #6bcf8e;
+  color: #fff;
+}
+.collection-search__owned.owned:hover { background: #5ab87c; border-color: #5ab87c; }
 .collection-search__card-info {
   display: flex;
   align-items: center;

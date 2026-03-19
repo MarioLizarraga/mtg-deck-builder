@@ -1175,9 +1175,13 @@ function searchCollectionCards(query) {
   // Sort alphabetically
   entries.sort((a, b) => a[0].localeCompare(b[0]));
 
-  resultsContainer.innerHTML = entries.map(([name, info]) => `
-    <div class="collection-search__card">
+  resultsContainer.innerHTML = entries.map(([name, info]) => {
+    const escapedName = name.replace(/'/g, "\\'");
+    const isOwned = Storage.isCardOwned(name);
+    return `
+    <div class="collection-search__card ${isOwned ? '' : 'collection-search__card--missing'}">
       <div class="collection-search__card-info">
+        <div class="collection-search__owned ${isOwned ? 'owned' : ''}" onclick="event.stopPropagation(); toggleCollectionOwned('${escapedName}')" title="${isOwned ? 'Owned — click to unmark' : 'Click to mark as owned'}">&#10003;</div>
         ${info.imageUrl ? `<img class="collection-search__card-img" src="${info.imageUrl}" alt="${name}">` : ''}
         <div>
           <div class="collection-search__card-name">${name}</div>
@@ -1192,7 +1196,13 @@ function searchCollectionCards(query) {
         `).join('')}
       </div>
     </div>
-  `).join('');
+  `}).join('');
+}
+
+function toggleCollectionOwned(cardName) {
+  Storage.toggleCardOwned(cardName);
+  const input = document.getElementById('collection-card-search');
+  if (input && input.value) searchCollectionCards(input.value);
 }
 
 function clearCollectionSearch() {
