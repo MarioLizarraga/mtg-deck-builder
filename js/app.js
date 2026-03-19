@@ -360,6 +360,7 @@ function renderBuilder(data) {
 
   const totalCards = Storage.getDeckTotalCards(deck);
   const totalPrice = Storage.getDeckTotalPrice(deck);
+  const { have: ownedCount, missing: missingCount } = Storage.getDeckOwnedCount(deck);
 
   // Group cards by category
   const categories = {};
@@ -409,6 +410,14 @@ function renderBuilder(data) {
           <div class="deck-info-bar__stat">
             <span class="deck-info-bar__stat-val" style="color:var(--color-accent)">$${totalPrice.toFixed(2)}</span>
             <span class="deck-info-bar__stat-label">Value</span>
+          </div>
+          <div class="deck-info-bar__stat">
+            <span class="deck-info-bar__stat-val stat-owned">${ownedCount}</span>
+            <span class="deck-info-bar__stat-label">Owned</span>
+          </div>
+          <div class="deck-info-bar__stat">
+            <span class="deck-info-bar__stat-val stat-missing">${missingCount}</span>
+            <span class="deck-info-bar__stat-label">Missing</span>
           </div>
         </div>
       </div>
@@ -487,18 +496,26 @@ function renderBuilder(data) {
 }
 
 function renderDeckCard(card, deckId, zone) {
+  const isOwned = Storage.isCardOwned(card.name);
+  const escapedName = card.name.replace(/'/g, "\\'");
   return `
-    <div class="deck-card" draggable="true" ondragstart="event.dataTransfer.setData('text/plain', '${card.name}')">
+    <div class="deck-card ${isOwned ? '' : 'deck-card--missing'}" draggable="true" ondragstart="event.dataTransfer.setData('text/plain', '${card.name}')">
+      <div class="deck-card__owned ${isOwned ? 'owned' : ''}" onclick="toggleOwned('${escapedName}', '${deckId}')" title="${isOwned ? 'Owned — click to unmark' : 'Click to mark as owned'}">&#10003;</div>
       <span class="deck-card__qty">${card.qty}x</span>
-      <span class="deck-card__name" onclick="showCardDetailByName('${card.name.replace(/'/g, "\\'")}')">${card.name}</span>
+      <span class="deck-card__name" onclick="showCardDetailByName('${escapedName}')">${card.name}</span>
       <span class="deck-card__mana">${Scryfall.renderMana(card.manaCost)}</span>
       <span class="deck-card__price">${card.price ? '$' + parseFloat(card.price).toFixed(2) : '—'}</span>
       <div class="deck-card__actions">
-        <button class="deck-card__btn" onclick="addOneMore('${deckId}', '${card.name.replace(/'/g, "\\'")}', '${zone}')">+</button>
-        <button class="deck-card__btn deck-card__btn--remove" onclick="removeOne('${deckId}', '${card.name.replace(/'/g, "\\'")}', '${zone}')">-</button>
+        <button class="deck-card__btn" onclick="addOneMore('${deckId}', '${escapedName}', '${zone}')">+</button>
+        <button class="deck-card__btn deck-card__btn--remove" onclick="removeOne('${deckId}', '${escapedName}', '${zone}')">-</button>
       </div>
     </div>
   `;
+}
+
+function toggleOwned(cardName, deckId) {
+  Storage.toggleCardOwned(cardName);
+  renderBuilder({ deckId });
 }
 
 let currentTypeFilter = '';
@@ -855,22 +872,149 @@ function updateCompare() {
     const unique1 = [...names1].filter(n => !names2.has(n));
     const unique2 = [...names2].filter(n => !names1.has(n));
 
+    // Owned status for all cards across both decks
+    const owned = Storage.getOwnedCards();
+    const allCardNames = new Set([...names1, ...names2]);
+    const notOwned = [...allCardNames].filter(n => !owned.has(n));
+
+    // Helper to get qty from a deck's card list
+    function getQty(deckData, name) {
+      const c = deckData.cards.find(x => x.name === name);
+      return c ? (c.qty || 1) : 0;
+    }
+
+    // Build clickable card list HTML
+    function renderAnalysisCards(cardNames, deck1Data, deck2Data) {
+      return cardNames.map(name => {
+        const isOwned = owned.has(name);
+        const q1 = deck1Data ? getQty(deck1Data, name) : 0;
+        const q2 = deck2Data ? getQty(deck2Data, name) : 0;
+        const qtyLabel = q1 && q2 ? `${q1}/${q2}` : `${q1 || q2}x`;
+        return `
+          <div class="analysis-card" onclick="showCardDetailByName('${name.replace(/'/g, "\\'")}')">
+            <span class="analysis-card__qty">${qtyLabel}</span>
+            <span class="analysis-card__name">${name}</span>
+            <span class="analysis-card__owned-tag ${isOwned ? 'analysis-card__owned-tag--have' : 'analysis-card__owned-tag--need'}">${isOwned ? 'Have' : 'Need'}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Store data for export
+    window._compareAnalysis = { shared, unique1, unique2, notOwned, deck1Name: deck1.name, deck2Name: deck2.name };
+
     results.innerHTML += `
       <div class="dash-card" style="grid-column:span 2">
         <div class="dash-card__header">
           <h3>Analysis</h3>
         </div>
-        <div class="dash-card__body" style="padding:16px">
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;text-align:center;margin-bottom:16px">
-            <div><span style="color:var(--color-heading);font-size:1.5rem;font-weight:800">${shared.length}</span><br><span style="color:var(--color-text-muted);font-size:.75rem">Shared Cards</span></div>
-            <div><span style="color:#6cabcf;font-size:1.5rem;font-weight:800">${unique1.length}</span><br><span style="color:var(--color-text-muted);font-size:.75rem">Unique to ${deck1.name}</span></div>
-            <div><span style="color:#6bcf8e;font-size:1.5rem;font-weight:800">${unique2.length}</span><br><span style="color:var(--color-text-muted);font-size:.75rem">Unique to ${deck2.name}</span></div>
+        <div class="dash-card__body" style="padding:16px;max-height:none">
+          <!-- Stats Row -->
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;text-align:center;margin-bottom:20px">
+            <div><span style="color:var(--color-heading);font-size:1.5rem;font-weight:800">${shared.length}</span><br><span style="color:var(--color-text-muted);font-size:.75rem">Shared</span></div>
+            <div><span style="color:#6cabcf;font-size:1.5rem;font-weight:800">${unique1.length}</span><br><span style="color:var(--color-text-muted);font-size:.75rem">Unique to A</span></div>
+            <div><span style="color:#6bcf8e;font-size:1.5rem;font-weight:800">${unique2.length}</span><br><span style="color:var(--color-text-muted);font-size:.75rem">Unique to B</span></div>
+            <div><span style="color:#cf6b6b;font-size:1.5rem;font-weight:800">${notOwned.length}</span><br><span style="color:var(--color-text-muted);font-size:.75rem">Not Owned</span></div>
           </div>
-          ${shared.length > 0 ? `<p style="color:var(--color-text-muted);font-size:.8rem"><strong style="color:var(--color-heading)">Shared:</strong> ${shared.join(', ')}</p>` : ''}
+
+          <!-- Shared Cards -->
+          <div class="analysis-section">
+            <div class="analysis-section__header">
+              <h4 style="color:var(--color-heading)">Shared Cards</h4>
+              <span class="analysis-section__count" style="color:var(--color-text-muted)">${shared.length}</span>
+            </div>
+            ${shared.length === 0 ? '<p style="color:var(--color-text-muted);font-size:.82rem;padding:8px">No shared cards.</p>' : renderAnalysisCards(shared, deck1, deck2)}
+          </div>
+
+          <!-- Unique to Deck A -->
+          <div class="analysis-section">
+            <div class="analysis-section__header">
+              <h4 style="color:#6cabcf">Unique to ${deck1.name}</h4>
+              <span class="analysis-section__count" style="color:#6cabcf">${unique1.length}</span>
+            </div>
+            ${unique1.length === 0 ? '<p style="color:var(--color-text-muted);font-size:.82rem;padding:8px">No unique cards.</p>' : renderAnalysisCards(unique1, deck1, null)}
+          </div>
+
+          <!-- Unique to Deck B -->
+          <div class="analysis-section">
+            <div class="analysis-section__header">
+              <h4 style="color:#6bcf8e">Unique to ${deck2.name}</h4>
+              <span class="analysis-section__count" style="color:#6bcf8e">${unique2.length}</span>
+            </div>
+            ${unique2.length === 0 ? '<p style="color:var(--color-text-muted);font-size:.82rem;padding:8px">No unique cards.</p>' : renderAnalysisCards(unique2, null, deck2)}
+          </div>
+
+          <!-- Cards Not Owned (combined) -->
+          <div class="analysis-section">
+            <div class="analysis-section__header">
+              <h4 style="color:#cf6b6b">Cards I Don't Own (Combined)</h4>
+              <span class="analysis-section__count" style="color:#cf6b6b">${notOwned.length}</span>
+            </div>
+            ${notOwned.length === 0 ? '<p style="color:var(--color-text-muted);font-size:.82rem;padding:8px">You own all the cards! Nice collection.</p>' : renderAnalysisCards(notOwned, deck1, deck2)}
+          </div>
+
+          <!-- Export bar -->
+          <div class="analysis-export-bar">
+            <button class="btn btn--outline btn--sm" onclick="exportAnalysis('shared')">Export Shared</button>
+            <button class="btn btn--outline btn--sm" onclick="exportAnalysis('unique1')">Export Unique A</button>
+            <button class="btn btn--outline btn--sm" onclick="exportAnalysis('unique2')">Export Unique B</button>
+            <button class="btn btn--danger btn--sm" style="border-radius:var(--radius-full)" onclick="exportAnalysis('notOwned')">Export Missing</button>
+            <button class="btn btn--primary btn--sm" onclick="exportAnalysis('all')">Export All</button>
+          </div>
         </div>
       </div>
     `;
   }
+}
+
+function exportAnalysis(type) {
+  const data = window._compareAnalysis;
+  if (!data) return;
+  let lines = [];
+  let filename = '';
+
+  switch (type) {
+    case 'shared':
+      filename = 'shared_cards';
+      lines.push(`// Shared cards between ${data.deck1Name} and ${data.deck2Name}`);
+      data.shared.forEach(n => lines.push(`1 ${n}`));
+      break;
+    case 'unique1':
+      filename = `unique_${data.deck1Name.replace(/[^a-z0-9]/gi, '_')}`;
+      lines.push(`// Cards unique to ${data.deck1Name}`);
+      data.unique1.forEach(n => lines.push(`1 ${n}`));
+      break;
+    case 'unique2':
+      filename = `unique_${data.deck2Name.replace(/[^a-z0-9]/gi, '_')}`;
+      lines.push(`// Cards unique to ${data.deck2Name}`);
+      data.unique2.forEach(n => lines.push(`1 ${n}`));
+      break;
+    case 'notOwned':
+      filename = 'cards_not_owned';
+      lines.push(`// Cards not owned (combined from ${data.deck1Name} + ${data.deck2Name})`);
+      data.notOwned.forEach(n => lines.push(`1 ${n}`));
+      break;
+    case 'all':
+      filename = 'compare_analysis';
+      lines.push(`// Compare Analysis: ${data.deck1Name} vs ${data.deck2Name}\n`);
+      lines.push(`// Shared (${data.shared.length})`);
+      data.shared.forEach(n => lines.push(`1 ${n}`));
+      lines.push(`\n// Unique to ${data.deck1Name} (${data.unique1.length})`);
+      data.unique1.forEach(n => lines.push(`1 ${n}`));
+      lines.push(`\n// Unique to ${data.deck2Name} (${data.unique2.length})`);
+      data.unique2.forEach(n => lines.push(`1 ${n}`));
+      lines.push(`\n// Not Owned (${data.notOwned.length})`);
+      data.notOwned.forEach(n => lines.push(`1 ${n}`));
+      break;
+  }
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${filename}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ═══════════════════════════════════════════════════════════

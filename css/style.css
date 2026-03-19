@@ -597,6 +597,47 @@ a:hover { color: var(--color-accent-light); }
 .deck-card__btn:hover { color: var(--color-accent); background: var(--color-accent-glow); }
 .deck-card__btn--remove:hover { color: #cf6b6b; background: #cf6b6b1a; }
 
+/* ── Owned indicator ──────────────────────────────────── */
+.deck-card__owned {
+  width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--color-border);
+  cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  transition: all var(--transition); font-size: .65rem; color: transparent; background: transparent;
+}
+.deck-card__owned:hover { border-color: var(--color-accent); }
+.deck-card__owned.owned { border-color: #6bcf8e; background: #6bcf8e; color: #000; }
+.deck-card--missing { opacity: .7; }
+.deck-card--missing .deck-card__name { color: var(--color-text-muted); }
+
+.stat-owned { color: #6bcf8e !important; }
+.stat-missing { color: #cf6b6b !important; }
+
+/* ── Analysis card lists ──────────────────────────────── */
+.analysis-section { margin-bottom: 20px; }
+.analysis-section__header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid var(--color-border); margin-bottom: 8px;
+}
+.analysis-section__header h4 { font-size: .85rem; font-weight: 700; }
+.analysis-section__count { font-size: .75rem; font-weight: 700; }
+.analysis-card {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px;
+  border-radius: 4px; transition: background var(--transition); cursor: pointer;
+  font-size: .82rem; border-bottom: 1px solid #2a2a3a33;
+}
+.analysis-card:hover { background: var(--color-bg-card-hover); }
+.analysis-card__name { color: var(--color-heading); flex: 1; font-weight: 500; }
+.analysis-card__qty { color: var(--color-accent); font-weight: 800; min-width: 24px; }
+.analysis-card__owned-tag {
+  font-size: .6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  padding: 1px 6px; border-radius: var(--radius-full);
+}
+.analysis-card__owned-tag--have { color: #6bcf8e; background: #6bcf8e1a; }
+.analysis-card__owned-tag--need { color: #cf6b6b; background: #cf6b6b1a; }
+.analysis-export-bar {
+  display: flex; gap: 8px; justify-content: flex-end; padding: 12px 0;
+  border-top: 1px solid var(--color-border); margin-top: 12px;
+}
+
 /* ── Mana Symbols ─────────────────────────────────────── */
 .mana { display: inline-flex; gap: 2px; }
 .mana-sym {

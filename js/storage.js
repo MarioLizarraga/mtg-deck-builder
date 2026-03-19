@@ -5,6 +5,7 @@
 const Storage = (() => {
   const DECKS_KEY = 'mtg_decks';
   const SETTINGS_KEY = 'mtg_settings';
+  const OWNED_KEY = 'mtg_owned_cards';
 
   function getDecks() {
     try {
@@ -103,10 +104,55 @@ const Storage = (() => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }
 
+  // ── Owned Cards ────────────────────────────────────────
+  function getOwnedCards() {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(OWNED_KEY)) || []);
+    } catch { return new Set(); }
+  }
+
+  function saveOwnedCards(owned) {
+    localStorage.setItem(OWNED_KEY, JSON.stringify([...owned]));
+  }
+
+  function isCardOwned(cardName) {
+    return getOwnedCards().has(cardName);
+  }
+
+  function toggleCardOwned(cardName) {
+    const owned = getOwnedCards();
+    if (owned.has(cardName)) owned.delete(cardName);
+    else owned.add(cardName);
+    saveOwnedCards(owned);
+    return owned.has(cardName);
+  }
+
+  function setCardOwned(cardName, isOwned) {
+    const owned = getOwnedCards();
+    if (isOwned) owned.add(cardName);
+    else owned.delete(cardName);
+    saveOwnedCards(owned);
+  }
+
+  function getDeckOwnedCount(deck) {
+    const owned = getOwnedCards();
+    let have = 0, missing = 0;
+    for (const c of (deck.cards || [])) {
+      if (owned.has(c.name)) have += (c.qty || 1);
+      else missing += (c.qty || 1);
+    }
+    for (const c of (deck.sideboard || [])) {
+      if (owned.has(c.name)) have += (c.qty || 1);
+      else missing += (c.qty || 1);
+    }
+    return { have, missing };
+  }
+
   return {
     getDecks, saveDecks, getDeck, saveDeck, deleteDeck, createDeck,
     addCardToDeck, removeCardFromDeck,
     getDeckTotalCards, getDeckTotalPrice,
     getSettings, saveSettings,
+    getOwnedCards, saveOwnedCards, isCardOwned, toggleCardOwned, setCardOwned, getDeckOwnedCount,
   };
 })();
