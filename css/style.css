@@ -817,6 +817,123 @@ a:hover { color: var(--color-accent-light); }
 .deck-tile--new svg { width: 32px; height: 32px; }
 .deck-tile--new span { font-size: .9rem; font-weight: 600; }
 
+/* ── Collection Card Search ───────────────────────────── */
+.collection-search { margin-bottom: 24px; }
+.collection-search__input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.collection-search__icon {
+  position: absolute;
+  left: 14px;
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+.collection-search__input {
+  width: 100%;
+  padding: 12px 40px 12px 42px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: .95rem;
+  font-family: var(--font-body);
+  transition: border-color var(--transition);
+}
+.collection-search__input::placeholder { color: var(--color-text-muted); }
+.collection-search__input:focus { outline: none; border-color: var(--color-accent); }
+.collection-search__clear {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 1.3rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
+.collection-search__clear:hover { color: var(--color-heading); }
+
+.collection-search__results {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.collection-search__empty {
+  color: var(--color-text-muted);
+  font-size: .9rem;
+  padding: 16px;
+  text-align: center;
+}
+.collection-search__card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  flex-wrap: wrap;
+}
+.collection-search__card-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.collection-search__card-img {
+  width: 36px;
+  height: 50px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.collection-search__card-name {
+  color: var(--color-heading);
+  font-weight: 700;
+  font-size: .9rem;
+}
+.collection-search__card-type {
+  color: var(--color-text-muted);
+  font-size: .78rem;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.collection-search__card-decks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.collection-search__deck-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(201, 168, 108, .1);
+  border: 1px solid rgba(201, 168, 108, .25);
+  border-radius: 20px;
+  color: var(--color-accent);
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.collection-search__deck-tag:hover {
+  background: rgba(201, 168, 108, .2);
+  border-color: var(--color-accent);
+}
+.collection-search__deck-qty {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
 /* ── Card Detail ──────────────────────────────────────── */
 .card-detail { display: flex; gap: 24px; }
 .card-detail__img { width: 240px; border-radius: var(--radius-md); flex-shrink: 0; }

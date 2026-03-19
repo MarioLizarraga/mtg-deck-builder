@@ -1062,6 +1062,15 @@ function renderCollection() {
       </div>
     </div>
 
+    <div class="collection-search">
+      <div class="collection-search__input-wrap">
+        <svg class="collection-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="collection-card-search" class="collection-search__input" placeholder="Search cards across all decks..." oninput="searchCollectionCards(this.value)">
+        <button id="collection-search-clear" class="collection-search__clear" onclick="clearCollectionSearch()" style="display:none">&times;</button>
+      </div>
+      <div id="collection-search-results" class="collection-search__results"></div>
+    </div>
+
     <div class="decks-grid">
       <div class="deck-tile deck-tile--new" onclick="createNewDeckFromCollection()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -1123,6 +1132,73 @@ function exportDeck(deckId) {
   a.download = `${deck.name.replace(/[^a-z0-9]/gi, '_')}.txt`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  COLLECTION CARD SEARCH
+// ═══════════════════════════════════════════════════════════
+function searchCollectionCards(query) {
+  const resultsContainer = document.getElementById('collection-search-results');
+  const clearBtn = document.getElementById('collection-search-clear');
+  if (!resultsContainer) return;
+
+  query = query.trim().toLowerCase();
+  clearBtn.style.display = query ? 'block' : 'none';
+
+  if (!query) {
+    resultsContainer.innerHTML = '';
+    return;
+  }
+
+  const decks = Storage.getDecks();
+  // Build a map: cardName → [{ deckName, deckId, qty, zone }]
+  const cardMap = {};
+  decks.forEach(deck => {
+    deck.cards.forEach(c => {
+      if (!c.name.toLowerCase().includes(query)) return;
+      if (!cardMap[c.name]) cardMap[c.name] = { imageUrl: c.imageUrl, manaCost: c.manaCost, typeLine: c.typeLine, decks: [] };
+      cardMap[c.name].decks.push({ deckName: deck.name, deckId: deck.id, qty: c.qty, zone: 'Main' });
+    });
+    deck.sideboard.forEach(c => {
+      if (!c.name.toLowerCase().includes(query)) return;
+      if (!cardMap[c.name]) cardMap[c.name] = { imageUrl: c.imageUrl, manaCost: c.manaCost, typeLine: c.typeLine, decks: [] };
+      cardMap[c.name].decks.push({ deckName: deck.name, deckId: deck.id, qty: c.qty, zone: 'Side' });
+    });
+  });
+
+  const entries = Object.entries(cardMap);
+  if (entries.length === 0) {
+    resultsContainer.innerHTML = `<div class="collection-search__empty">No cards found matching "${query}"</div>`;
+    return;
+  }
+
+  // Sort alphabetically
+  entries.sort((a, b) => a[0].localeCompare(b[0]));
+
+  resultsContainer.innerHTML = entries.map(([name, info]) => `
+    <div class="collection-search__card">
+      <div class="collection-search__card-info">
+        ${info.imageUrl ? `<img class="collection-search__card-img" src="${info.imageUrl}" alt="${name}">` : ''}
+        <div>
+          <div class="collection-search__card-name">${name}</div>
+          <div class="collection-search__card-type">${info.typeLine || ''}${info.manaCost ? ' · ' + Scryfall.renderMana(info.manaCost) : ''}</div>
+        </div>
+      </div>
+      <div class="collection-search__card-decks">
+        ${info.decks.map(d => `
+          <span class="collection-search__deck-tag" onclick="event.stopPropagation(); navigate('builder', { deckId: '${d.deckId}' })">
+            ${d.deckName} <span class="collection-search__deck-qty">${d.qty}x ${d.zone}</span>
+          </span>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function clearCollectionSearch() {
+  const input = document.getElementById('collection-card-search');
+  if (input) { input.value = ''; input.focus(); }
+  searchCollectionCards('');
 }
 
 // ═══════════════════════════════════════════════════════════
