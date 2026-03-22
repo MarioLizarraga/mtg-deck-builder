@@ -11,7 +11,7 @@
 
 const SupabaseSync = (() => {
   const SUPABASE_URL = 'https://cuzipcfnvtndaxzedtsk.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_7lqFPSSdEj_iv_f25DJN3w_B1_bDzhM';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1emlwY2ZudnRuZGF4emVkdHNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDkxODMsImV4cCI6MjA4OTc4NTE4M30.w2y8Yv4WTFhnSJ84SHy3D93HtSXgoLV3LEMWWWhhKcQ';
 
   let sb = null;
   let currentUser = null;
@@ -23,12 +23,7 @@ const SupabaseSync = (() => {
   async function init() {
     if (typeof supabase === 'undefined') { console.warn('Supabase SDK not loaded'); return; }
     sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: { storageKey: 'mtg-auth', lock: false, flowType: 'implicit' },
-      global: { fetch: (url, options = {}) => {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
-        return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeout));
-      }}
+      auth: { storageKey: 'mtg-auth', lock: false, flowType: 'implicit' }
     });
 
     sb.auth.onAuthStateChange(async (event, session) => {
@@ -239,22 +234,7 @@ const SupabaseSync = (() => {
     loadSharesAsync();
   }
 
-  // Test if shares table is accessible
-  async function testSharesTable() {
-    try {
-      const { error } = await sb.from('shares').select('id').limit(1);
-      if (error) { console.error('Shares table not accessible:', error.message); return false; }
-      return true;
-    } catch { return false; }
-  }
-
   async function loadSharesAsync() {
-    const ok = await testSharesTable();
-    if (!ok) {
-      const el = document.getElementById('shares-list');
-      if (el) el.innerHTML = '<div style="color:var(--color-text-muted);font-size:.82rem">Sharing unavailable — check Supabase table setup.</div>';
-      return;
-    }
     const run = async (fn, containerId) => {
       try {
         await Promise.race([fn(), new Promise((_, r) => setTimeout(() => r('timeout'), 5000))]);
