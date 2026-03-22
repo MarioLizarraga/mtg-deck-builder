@@ -1604,15 +1604,22 @@ async function searchScryfallForOwned(query) {
     resultsContainer.innerHTML = data.data.slice(0, 25).map(card => {
       const escapedName = card.name.replace(/'/g, "\\'");
       const isOwned = Storage.isCardOwned(card.name);
+      const ownedQty = isOwned ? Storage.getOwnedCardQty(card.name) : 0;
       const neededIn = deckNeedMap[card.name] || [];
       const setName = card.set_name || '';
       const setCode = (card.set || '').toLowerCase();
 
       return `
         <div class="scryfall-result ${isOwned ? 'scryfall-result--owned' : ''}">
-          <div class="scryfall-result__toggle ${isOwned ? 'owned' : ''}" onclick="event.stopPropagation(); toggleScryfallOwned('${card.id}')" title="${isOwned ? 'Remove from collection' : 'Add to collection'}">
-            ${isOwned ? '&#10003;' : '+'}
-          </div>
+          ${isOwned ? `
+            <div class="scryfall-result__qty-controls">
+              <button class="owned-card__qty-btn" onclick="event.stopPropagation(); changeScryfallOwnedQty('${card.id}', -1)">-</button>
+              <span class="scryfall-result__qty">${ownedQty}x</span>
+              <button class="owned-card__qty-btn" onclick="event.stopPropagation(); changeScryfallOwnedQty('${card.id}', 1)">+</button>
+            </div>
+          ` : `
+            <div class="scryfall-result__toggle" onclick="event.stopPropagation(); toggleScryfallOwned('${card.id}')" title="Add to collection">+</div>
+          `}
           <img class="scryfall-result__img" src="${Scryfall.getSmallImage(card)}" alt="" loading="lazy" onclick="showCardDetailByName('${escapedName}')">
           <div class="scryfall-result__details">
             <div class="scryfall-result__name">${card.name}</div>
@@ -1664,11 +1671,27 @@ function toggleScryfallOwned(cardId) {
   if (!card) return;
   const meta = cardMetaFromScryfall(card);
   Storage.toggleCardOwned(card.name, meta);
-  // Re-render scryfall results in place
+  rerenderScryfallResults();
+  renderOwnedCardsList();
+}
+
+function changeScryfallOwnedQty(cardId, delta) {
+  const card = _ownedScryfallCache[cardId];
+  if (!card) return;
+  const currentQty = Storage.getOwnedCardQty(card.name);
+  const newQty = currentQty + delta;
+  if (newQty <= 0) {
+    Storage.setCardOwned(card.name, false);
+  } else {
+    Storage.setOwnedCardQty(card.name, newQty);
+  }
+  rerenderScryfallResults();
+  renderOwnedCardsList();
+}
+
+function rerenderScryfallResults() {
   const input = document.getElementById('owned-scryfall-search');
   if (input && input.value) searchScryfallForOwned(input.value);
-  // Update owned cards browser
-  renderOwnedCardsList();
 }
 
 function clearOwnedScryfallSearch() {

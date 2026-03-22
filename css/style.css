@@ -1249,6 +1249,19 @@ a:hover { color: var(--color-accent-light); }
   color: #fff;
 }
 .scryfall-result__toggle.owned:hover { background: #cf6b6b; border-color: #cf6b6b; }
+.scryfall-result__qty-controls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.scryfall-result__qty {
+  color: #6bcf8e;
+  font-weight: 700;
+  font-size: .85rem;
+  min-width: 26px;
+  text-align: center;
+}
 .scryfall-result__img {
   width: 40px;
   height: 56px;
