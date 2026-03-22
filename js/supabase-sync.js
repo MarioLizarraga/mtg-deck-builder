@@ -25,7 +25,8 @@ const SupabaseSync = (() => {
       currentUser = session?.user || null;
       updateAuthUI();
 
-      if (event === 'SIGNED_IN' && currentUser) {
+      // Sync on sign in OR when session is restored on page load
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && currentUser) {
         try {
           await sb.rpc('resolve_pending_shares');
         } catch (e) { /* ignore if function doesn't exist yet */ }
@@ -372,7 +373,8 @@ const SupabaseSync = (() => {
 
   async function syncDecks() {
     const localDecks = Storage.getDecks();
-    const { data: remoteDecks } = await sb.from('decks').select('*').eq('user_id', currentUser.id);
+    const { data: remoteDecks, error: decksErr } = await sb.from('decks').select('*').eq('user_id', currentUser.id);
+    if (decksErr) { console.error('Sync decks pull error:', decksErr); showToast('Sync error: ' + decksErr.message, 'error'); return; }
     const remote = remoteDecks || [];
 
     const remoteMap = {};
@@ -384,7 +386,7 @@ const SupabaseSync = (() => {
     for (const ld of localDecks) {
       const rd = remoteMap[ld.id];
       if (!rd || new Date(ld.updatedAt) > new Date(rd.updated_at)) {
-        await sb.from('decks').upsert({
+        const { error: upsErr } = await sb.from('decks').upsert({
           id: ld.id,
           user_id: currentUser.id,
           name: ld.name,
@@ -394,6 +396,7 @@ const SupabaseSync = (() => {
           created_at: ld.createdAt,
           updated_at: ld.updatedAt,
         }, { onConflict: 'id,user_id' });
+        if (upsErr) console.error('Deck push error:', ld.name, upsErr);
       }
     }
 
@@ -420,7 +423,8 @@ const SupabaseSync = (() => {
 
   async function syncOwnedCards() {
     const localMap = Storage.getOwnedCardsRich();
-    const { data: remoteCards } = await sb.from('owned_cards').select('*').eq('user_id', currentUser.id);
+    const { data: remoteCards, error: cardsErr } = await sb.from('owned_cards').select('*').eq('user_id', currentUser.id);
+    if (cardsErr) { console.error('Sync owned cards pull error:', cardsErr); showToast('Sync error: ' + cardsErr.message, 'error'); return; }
     const remote = remoteCards || [];
 
     const remoteMap = {};
@@ -450,7 +454,8 @@ const SupabaseSync = (() => {
     if (toUpsert.length > 0) {
       // Batch in chunks of 50
       for (let i = 0; i < toUpsert.length; i += 50) {
-        await sb.from('owned_cards').upsert(toUpsert.slice(i, i + 50), { onConflict: 'user_id,card_name' });
+        const { error: batchErr } = await sb.from('owned_cards').upsert(toUpsert.slice(i, i + 50), { onConflict: 'user_id,card_name' });
+        if (batchErr) console.error('Owned cards push error:', batchErr);
       }
     }
 
