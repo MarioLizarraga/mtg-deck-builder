@@ -17,7 +17,8 @@ const SupabaseSync = (() => {
   let currentUser = null;
   let _syncing = false;
   let _syncDebounce = null;
-  let _coownPartnerId = null; // If co-owning, this is the host's user_id
+  let _coownPartnerId = null;
+  let _suppressHook = false; // Prevent write hooks during sync // If co-owning, this is the host's user_id
 
   // ── Init ──────────────────────────────────────────────
   async function init() {
@@ -595,6 +596,7 @@ const SupabaseSync = (() => {
     if (!sb || !currentUser) { console.log('[Sync] skipped — no client or user'); return; }
     if (_syncing) { console.log('[Sync] skipped — already syncing'); return; }
     _syncing = true;
+    _suppressHook = true; // Don't trigger push-backs while syncing
     setSyncStatus('syncing');
     try {
       console.log('[Sync] starting decks...');
@@ -610,6 +612,7 @@ const SupabaseSync = (() => {
       setSyncStatus('error');
       showToast('Sync failed: ' + err.message, 'error', 4000);
     }
+    _suppressHook = false;
     _syncing = false;
   }
 
@@ -691,7 +694,7 @@ const SupabaseSync = (() => {
   let _pushOwnedTimeout = null;
 
   function onStorageWrite(eventType, data) {
-    if (!currentUser || !sb) return;
+    if (!currentUser || !sb || _suppressHook) return;
     switch (eventType) {
       case 'deck:save': clearTimeout(_pushDeckTimeout); _pushDeckTimeout = setTimeout(() => pushDeck(data), 1000); break;
       case 'deck:delete': deleteDeckRemote(data); break;
