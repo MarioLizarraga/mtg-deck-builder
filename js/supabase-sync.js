@@ -558,8 +558,10 @@ const SupabaseSync = (() => {
   function setSyncStatus(status) {
     const el = document.getElementById('sync-status');
     if (!el) return;
+    el.style.display = '';
     el.className = 'sync-indicator sync-indicator--' + status;
     const labels = { syncing: 'Syncing...', synced: 'Synced', error: 'Sync error' };
+    el.textContent = labels[status] || '';
     el.title = labels[status] || '';
   }
 
