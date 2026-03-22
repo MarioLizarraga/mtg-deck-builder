@@ -26,32 +26,36 @@ const SupabaseSync = (() => {
       auth: { storageKey: 'mtg-auth', lock: false, flowType: 'implicit' }
     });
 
+    // Single handler for all auth events — only source of truth
+    let _initSyncDone = false;
     sb.auth.onAuthStateChange(async (event, session) => {
-      const wasLoggedIn = !!currentUser;
+      console.log('[Auth]', event, session?.user?.email || 'no user');
       currentUser = session?.user || null;
       updateAuthUI();
-      if (event === 'SIGNED_OUT') { currentUser = null; _coownPartnerId = null; updateAuthUI(); return; }
-      if (event === 'SIGNED_IN' && currentUser && !wasLoggedIn) {
+
+      if (event === 'SIGNED_OUT') {
+        currentUser = null;
+        _coownPartnerId = null;
+        _initSyncDone = false;
+        updateAuthUI();
+        return;
+      }
+
+      // Sync on any event that gives us a valid session (SIGNED_IN, TOKEN_REFRESHED, INITIAL_SESSION)
+      if (currentUser && !_syncing && !_initSyncDone) {
+        _initSyncDone = true;
         try {
+          console.log('[Auth] Starting sync...');
           await loadCoownState();
           await fullSync();
+          console.log('[Auth] Sync complete');
           if (typeof navigate === 'function') navigate(currentPage);
-        } catch (e) { console.error('Sign-in sync error:', e); }
+        } catch (e) {
+          console.error('[Auth] Sync error:', e);
+          _initSyncDone = false; // Allow retry
+        }
       }
     });
-
-    try {
-      const { data: { session } } = await sb.auth.getSession();
-      if (session?.user) {
-        currentUser = session.user;
-        updateAuthUI();
-        await loadCoownState();
-        await fullSync();
-        if (typeof navigate === 'function') navigate(currentPage);
-      }
-    } catch (e) {
-      console.error('Init session/sync error:', e);
-    }
 
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && currentUser) {
@@ -588,17 +592,21 @@ const SupabaseSync = (() => {
   function debouncedSync() { clearTimeout(_syncDebounce); _syncDebounce = setTimeout(() => fullSync(), 2000); }
 
   async function fullSync() {
-    if (!sb || !currentUser || _syncing) return;
+    if (!sb || !currentUser) { console.log('[Sync] skipped — no client or user'); return; }
+    if (_syncing) { console.log('[Sync] skipped — already syncing'); return; }
     _syncing = true;
     setSyncStatus('syncing');
     try {
-      await Promise.race([
-        Promise.all([syncDecks(), syncOwnedCards(), syncSettings()]),
-        new Promise((_, r) => setTimeout(() => r(new Error('Sync took too long — try again')), 30000))
-      ]);
+      console.log('[Sync] starting decks...');
+      await syncDecks();
+      console.log('[Sync] starting owned cards...');
+      await syncOwnedCards();
+      console.log('[Sync] starting settings...');
+      await syncSettings();
+      console.log('[Sync] complete');
       setSyncStatus('synced');
     } catch (err) {
-      console.error('Sync error:', err);
+      console.error('[Sync] error:', err);
       setSyncStatus('error');
       showToast('Sync failed: ' + err.message, 'error', 4000);
     }
