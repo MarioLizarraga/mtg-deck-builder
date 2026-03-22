@@ -200,57 +200,68 @@ async function globalSearchCards(query) {
 }
 
 // ── Card Detail Modal ────────────────────────────────────
-async function showCardDetail(cardId) {
+let _detailRequestId = 0; // Cancel stale requests
+
+function openDetailSkeleton() {
   const modal = document.getElementById('card-detail-modal');
   const title = document.getElementById('card-detail-title');
   const body = document.getElementById('card-detail-body');
   modal.style.display = 'flex';
   title.textContent = 'Loading...';
   body.innerHTML = `<div class="card-detail"><div class="skeleton skeleton-img" style="width:240px;height:340px"></div><div style="flex:1;display:flex;flex-direction:column;gap:8px"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text--short skeleton-text"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div></div>`;
+}
 
-  try {
-    const card = await Scryfall.getById(cardId);
-    title.textContent = card.name;
-    const oracleText = card.oracle_text || card.card_faces?.map(f => f.oracle_text).join('\n\n---\n\n') || 'No text';
-    const price = Scryfall.getPrice(card);
+function renderCardDetail(card) {
+  const title = document.getElementById('card-detail-title');
+  const body = document.getElementById('card-detail-body');
+  title.textContent = card.name;
+  const oracleText = card.oracle_text || card.card_faces?.map(f => f.oracle_text).join('\n\n---\n\n') || 'No text';
+  const price = Scryfall.getPrice(card);
+  const decks = Storage.getDecks();
+  const deckOptions = decks.length ? decks.map(d => `<option value="${d.id}">${d.name}</option>`).join('') : '<option value="">No decks yet</option>';
 
-    // Build deck selector
-    const decks = Storage.getDecks();
-    const deckOptions = decks.length ? decks.map(d => `<option value="${d.id}">${d.name}</option>`).join('') : '<option value="">No decks yet</option>';
-
-    body.innerHTML = `
-      <div class="card-detail">
-        <img class="card-detail__img" src="${Scryfall.getImageUrl(card, 'normal')}" alt="${card.name}" loading="lazy">
-        <div class="card-detail__info">
-          <div class="card-detail__type">${card.type_line || ''}</div>
-          <div style="margin-bottom:8px">${Scryfall.renderMana(card.mana_cost)}</div>
-          <div class="card-detail__oracle">${oracleText}</div>
-          ${card.power != null ? `<div class="card-detail__row"><span class="card-detail__row-label">P/T</span><span class="card-detail__row-val">${card.power}/${card.toughness}</span></div>` : ''}
-          <div class="card-detail__row"><span class="card-detail__row-label">Set</span><span class="card-detail__row-val">${card.set_name} (${card.set.toUpperCase()})</span></div>
-          <div class="card-detail__row"><span class="card-detail__row-label">Rarity</span><span class="card-detail__row-val" style="text-transform:capitalize">${card.rarity}</span></div>
-          <div class="card-detail__row card-detail__price-row"><span class="card-detail__row-label">Price (USD)</span><span class="card-detail__row-val">${Scryfall.formatPrice(price)}</span></div>
-          ${card.prices?.usd_foil ? `<div class="card-detail__row"><span class="card-detail__row-label">Foil Price</span><span class="card-detail__row-val" style="color:#c9a86c">$${parseFloat(card.prices.usd_foil).toFixed(2)}</span></div>` : ''}
-          ${card.legalities ? `
-            <div class="card-detail__row">
-              <span class="card-detail__row-label">Legality</span>
-              <span class="card-detail__row-val" style="display:flex;gap:4px;flex-wrap:wrap">
-                ${['standard','pioneer','modern','legacy','commander','pauper'].map(f =>
-                  `<span class="legality-badge legality-badge--${card.legalities[f]}">${f.slice(0,3).toUpperCase()}</span>`
-                ).join('')}
-              </span>
-            </div>
-          ` : ''}
-          <div class="card-detail__actions">
-            <select id="detail-deck-select" class="deck-info-bar__format">${deckOptions}</select>
-            <button class="btn btn--primary btn--sm" onclick="addCardFromDetail('${card.id}')">Add to Deck</button>
+  body.innerHTML = `
+    <div class="card-detail">
+      <img class="card-detail__img" src="${Scryfall.getImageUrl(card, 'normal')}" alt="${card.name}" loading="lazy">
+      <div class="card-detail__info">
+        <div class="card-detail__type">${card.type_line || ''}</div>
+        <div style="margin-bottom:8px">${Scryfall.renderMana(card.mana_cost)}</div>
+        <div class="card-detail__oracle">${oracleText}</div>
+        ${card.power != null ? `<div class="card-detail__row"><span class="card-detail__row-label">P/T</span><span class="card-detail__row-val">${card.power}/${card.toughness}</span></div>` : ''}
+        <div class="card-detail__row"><span class="card-detail__row-label">Set</span><span class="card-detail__row-val">${card.set_name} (${card.set.toUpperCase()})</span></div>
+        <div class="card-detail__row"><span class="card-detail__row-label">Rarity</span><span class="card-detail__row-val" style="text-transform:capitalize">${card.rarity}</span></div>
+        <div class="card-detail__row card-detail__price-row"><span class="card-detail__row-label">Price (USD)</span><span class="card-detail__row-val">${Scryfall.formatPrice(price)}</span></div>
+        ${card.prices?.usd_foil ? `<div class="card-detail__row"><span class="card-detail__row-label">Foil Price</span><span class="card-detail__row-val" style="color:#c9a86c">$${parseFloat(card.prices.usd_foil).toFixed(2)}</span></div>` : ''}
+        ${card.legalities ? `
+          <div class="card-detail__row">
+            <span class="card-detail__row-label">Legality</span>
+            <span class="card-detail__row-val" style="display:flex;gap:4px;flex-wrap:wrap">
+              ${['standard','pioneer','modern','legacy','commander','pauper'].map(f =>
+                `<span class="legality-badge legality-badge--${card.legalities[f]}">${f.slice(0,3).toUpperCase()}</span>`
+              ).join('')}
+            </span>
           </div>
+        ` : ''}
+        <div class="card-detail__actions">
+          <select id="detail-deck-select" class="deck-info-bar__format">${deckOptions}</select>
+          <button class="btn btn--primary btn--sm" onclick="addCardFromDetail('${card.id}')">Add to Deck</button>
         </div>
       </div>
-    `;
-    // Store card data for adding
-    window._lastDetailCard = card;
+    </div>
+  `;
+  window._lastDetailCard = card;
+}
+
+async function showCardDetail(cardId) {
+  const reqId = ++_detailRequestId;
+  openDetailSkeleton();
+  try {
+    const card = await Scryfall.getById(cardId);
+    if (reqId !== _detailRequestId) return; // Stale request, discard
+    renderCardDetail(card);
   } catch (err) {
-    body.innerHTML = '<p class="gsearch__empty">Error loading card.</p>';
+    if (reqId !== _detailRequestId) return;
+    document.getElementById('card-detail-body').innerHTML = '<p class="gsearch__empty">Error loading card.</p>';
   }
 }
 
@@ -887,11 +898,16 @@ function changeDeckFormat(deckId, format) {
 }
 
 async function showCardDetailByName(name) {
+  const reqId = ++_detailRequestId;
+  openDetailSkeleton();
   try {
     const card = await Scryfall.getByName(name);
-    showCardDetail(card.id);
+    if (reqId !== _detailRequestId) return; // Stale request
+    renderCardDetail(card);
   } catch {
+    if (reqId !== _detailRequestId) return;
     showToast('Card not found.', 'error');
+    document.getElementById('card-detail-modal').style.display = 'none';
   }
 }
 
