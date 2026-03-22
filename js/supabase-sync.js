@@ -123,15 +123,18 @@ const SupabaseSync = (() => {
     return await sb.auth.signInWithPassword({ email, password });
   }
   async function signOut() {
-    if (!sb) return;
-    try { await sb.auth.signOut(); } catch (e) { console.error('Sign out error:', e); }
+    // Clear ALL Supabase auth state from localStorage
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('mtg-auth') || key.startsWith('sb-')) localStorage.removeItem(key);
+    }
     currentUser = null;
     _coownPartnerId = null;
-    localStorage.removeItem('mtg-auth');
+    try { if (sb) await sb.auth.signOut(); } catch (e) { /* ignore */ }
     updateAuthUI();
     const syncEl = document.getElementById('sync-status');
     if (syncEl) syncEl.style.display = 'none';
     showToast('Signed out', 'info');
+    setTimeout(() => location.reload(), 500);
   }
   function isLoggedIn() { return !!currentUser; }
   function getUser() { return currentUser; }
