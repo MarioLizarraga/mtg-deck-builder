@@ -238,13 +238,18 @@ const SupabaseSync = (() => {
   }
 
   async function loadSharesAsync() {
-    const run = async (fn, containerId) => {
-      try {
-        await Promise.race([fn(), new Promise((_, r) => setTimeout(() => r('timeout'), 5000))]);
-      } catch (e) {
-        console.error(`${containerId}:`, e);
-        const el = document.getElementById(containerId);
-        if (el) el.innerHTML = '';
+    const run = async (fn, containerId, retries = 2) => {
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          await Promise.race([fn(), new Promise((_, r) => setTimeout(() => r('timeout'), 15000))]);
+          return; // success
+        } catch (e) {
+          console.warn(`${containerId}: attempt ${attempt + 1} failed —`, e);
+          if (attempt === retries) {
+            const el = document.getElementById(containerId);
+            if (el) el.innerHTML = '';
+          }
+        }
       }
     };
     await run(loadSharesUI, 'shares-list');
