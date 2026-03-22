@@ -291,9 +291,17 @@ function closeCardDetail() {
 function renderDashboard() {
   const container = document.getElementById('view-dashboard');
   const decks = Storage.getDecks();
-  const totalCards = decks.reduce((s, d) => s + Storage.getDeckTotalCards(d), 0);
-  const totalValue = decks.reduce((s, d) => s + Storage.getDeckTotalPrice(d), 0);
-  const formats = [...new Set(decks.map(d => d.format))];
+  const richMap = Storage.getOwnedCardsRich();
+  const ownedNames = Object.keys(richMap);
+  const ownedUniqueCount = ownedNames.length;
+  const ownedTotalQty = ownedNames.reduce((s, n) => s + (richMap[n].qty || 1), 0);
+  const ownedValue = ownedNames.reduce((s, n) => s + (parseFloat(richMap[n].price) || 0) * (richMap[n].qty || 1), 0);
+
+  // Most valuable owned cards
+  const topCards = ownedNames
+    .filter(n => richMap[n].price)
+    .sort((a, b) => (parseFloat(richMap[b].price) || 0) - (parseFloat(richMap[a].price) || 0))
+    .slice(0, 5);
 
   container.innerHTML = `
     <div class="dashboard">
@@ -303,17 +311,17 @@ function renderDashboard() {
       </div>
 
       <div class="dashboard__stats">
+        <div class="stat-card stat-card--green" onclick="navigate('collection')">
+          <span class="stat-card__value">${ownedTotalQty}</span>
+          <span class="stat-card__label">Cards Owned</span>
+        </div>
         <div class="stat-card stat-card--accent" onclick="navigate('collection')">
-          <span class="stat-card__value">${decks.length}</span>
-          <span class="stat-card__label">My Decks</span>
-        </div>
-        <div class="stat-card stat-card--blue" onclick="navigate('builder')">
-          <span class="stat-card__value">${totalCards}</span>
-          <span class="stat-card__label">Total Cards</span>
-        </div>
-        <div class="stat-card stat-card--green">
-          <span class="stat-card__value">$${totalValue.toFixed(0)}</span>
+          <span class="stat-card__value">$${ownedValue.toFixed(0)}</span>
           <span class="stat-card__label">Collection Value</span>
+        </div>
+        <div class="stat-card stat-card--blue" onclick="navigate('collection')">
+          <span class="stat-card__value">${decks.length}</span>
+          <span class="stat-card__label">Decks Built</span>
         </div>
         <div class="stat-card stat-card--red" onclick="navigate('meta')">
           <span class="stat-card__value">${MetaDecks.length}</span>
@@ -322,7 +330,53 @@ function renderDashboard() {
       </div>
 
       <div class="dash-grid">
-        <!-- Recent Decks -->
+        <!-- Collection Overview -->
+        <div class="dash-card">
+          <div class="dash-card__header">
+            <h3>My Collection</h3>
+            <span class="dash-card__link" onclick="navigate('collection')">Manage</span>
+          </div>
+          <div class="dash-card__body">
+            ${ownedUniqueCount === 0 ? '<p class="dash-card__empty">No cards in your collection yet. Go to Collection to start adding cards you own.</p>' : `
+              <div class="dash-task">
+                <div class="dash-task__left">
+                  <span class="dash-task__dot dash-task__dot--green"></span>
+                  <div>
+                    <span class="dash-task__title">${ownedUniqueCount} unique cards</span>
+                    <span class="dash-task__meta">${ownedTotalQty} total including duplicates</span>
+                  </div>
+                </div>
+                <div class="dash-task__right">
+                  <span class="dash-task__price">$${ownedValue.toFixed(2)}</span>
+                </div>
+              </div>
+              ${topCards.length > 0 ? `
+                <div style="margin-top:4px;padding-top:8px;border-top:1px solid var(--color-border)">
+                  <div style="color:var(--color-text-muted);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Most Valuable</div>
+                  ${topCards.map(name => {
+                    const m = richMap[name];
+                    return `
+                      <div class="dash-task" onclick="showCardDetailByName('${name.replace(/'/g, "\\'")}')">
+                        <div class="dash-task__left">
+                          ${m.imageUrl ? `<img src="${m.imageUrl}" style="width:28px;height:38px;border-radius:3px;object-fit:cover;flex-shrink:0" alt="">` : '<span class="dash-task__dot dash-task__dot--amber"></span>'}
+                          <div>
+                            <span class="dash-task__title">${name}</span>
+                            <span class="dash-task__meta">${m.typeLine || ''}${m.qty > 1 ? ' · ' + m.qty + 'x' : ''}</span>
+                          </div>
+                        </div>
+                        <div class="dash-task__right">
+                          <span class="dash-task__price">$${parseFloat(m.price).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              ` : ''}
+            `}
+          </div>
+        </div>
+
+        <!-- My Decks -->
         <div class="dash-card">
           <div class="dash-card__header">
             <h3>My Decks</h3>
@@ -330,13 +384,15 @@ function renderDashboard() {
           </div>
           <div class="dash-card__body">
             ${decks.length === 0 ? '<p class="dash-card__empty">No decks yet. Create your first deck!</p>' : ''}
-            ${decks.slice(0, 6).map(d => `
+            ${decks.slice(0, 6).map(d => {
+              const { have, missing } = Storage.getDeckOwnedCount(d);
+              return `
               <div class="dash-task" onclick="navigate('builder', { deckId: '${d.id}' })">
                 <div class="dash-task__left">
                   <span class="dash-task__dot dash-task__dot--amber"></span>
                   <div>
                     <span class="dash-task__title">${d.name}</span>
-                    <span class="dash-task__meta">${d.format} — ${Storage.getDeckTotalCards(d)} cards</span>
+                    <span class="dash-task__meta">${d.format} — ${Storage.getDeckTotalCards(d)} cards · <span style="color:#6bcf8e">${have} owned</span>${missing > 0 ? ` · <span style="color:#cf6b6b">${missing} missing</span>` : ''}</span>
                   </div>
                 </div>
                 <div class="dash-task__right">
@@ -344,7 +400,7 @@ function renderDashboard() {
                   <span class="dash-task__badge dash-task__badge--amber">${d.format}</span>
                 </div>
               </div>
-            `).join('')}
+            `}).join('')}
           </div>
         </div>
 
@@ -379,18 +435,18 @@ function renderDashboard() {
             <h3>Quick Access</h3>
           </div>
           <div class="dash-card__body dash-quick-links">
+            <div class="dash-quick" onclick="navigate('collection')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+              <div>
+                <strong>My Collection</strong>
+                <span>Add cards you own, track your collection</span>
+              </div>
+            </div>
             <div class="dash-quick" onclick="navigate('builder')">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
               <div>
                 <strong>Deck Builder</strong>
                 <span>Search cards, drag & drop, build decks</span>
-              </div>
-            </div>
-            <div class="dash-quick" onclick="navigate('meta')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
-              <div>
-                <strong>Meta Decks 2025-2026</strong>
-                <span>Championship-winning decklists & prices</span>
               </div>
             </div>
             <div class="dash-quick" onclick="navigate('compare')">
@@ -407,33 +463,6 @@ function renderDashboard() {
                 <span>Search any card via Scryfall — Ctrl+K</span>
               </div>
             </div>
-          </div>
-        </div>
-
-        <!-- Format Breakdown -->
-        <div class="dash-card">
-          <div class="dash-card__header">
-            <h3>Format Breakdown</h3>
-          </div>
-          <div class="dash-card__body">
-            ${['Standard', 'Pioneer', 'Modern', 'Commander', 'Legacy'].map(fmt => {
-              const count = decks.filter(d => d.format === fmt).length;
-              const metaCount = MetaDecks.filter(d => d.format === fmt).length;
-              return `
-                <div class="dash-task">
-                  <div class="dash-task__left">
-                    <span class="dash-task__dot dash-task__dot--blue"></span>
-                    <div>
-                      <span class="dash-task__title">${fmt}</span>
-                      <span class="dash-task__meta">${count} deck${count !== 1 ? 's' : ''} built</span>
-                    </div>
-                  </div>
-                  <div class="dash-task__right">
-                    <span class="dash-task__badge dash-task__badge--blue">${metaCount} meta</span>
-                  </div>
-                </div>
-              `;
-            }).join('')}
           </div>
         </div>
       </div>
