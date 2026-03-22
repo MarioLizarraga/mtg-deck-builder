@@ -253,11 +253,18 @@ function renderCardDetail(card) {
 }
 
 async function showCardDetail(cardId) {
+  // Use cached data from search results if available (instant, no API call)
+  const cached = window._searchResults?.[cardId] || _ownedScryfallCache?.[cardId];
+  if (cached) {
+    openDetailSkeleton();
+    renderCardDetail(cached);
+    return;
+  }
   const reqId = ++_detailRequestId;
   openDetailSkeleton();
   try {
     const card = await Scryfall.getById(cardId);
-    if (reqId !== _detailRequestId) return; // Stale request, discard
+    if (reqId !== _detailRequestId) return;
     renderCardDetail(card);
   } catch (err) {
     if (reqId !== _detailRequestId) return;
@@ -927,11 +934,22 @@ function changeDeckFormat(deckId, format) {
 }
 
 async function showCardDetailByName(name) {
+  // Check search result caches first (instant)
+  if (window._searchResults) {
+    const cached = Object.values(window._searchResults).find(c => c.name === name);
+    if (cached) { openDetailSkeleton(); renderCardDetail(cached); return; }
+  }
+  if (_ownedScryfallCache) {
+    const cached = Object.values(_ownedScryfallCache).find(c => c.name === name);
+    if (cached) { openDetailSkeleton(); renderCardDetail(cached); return; }
+  }
+
+  // Fall back to API
   const reqId = ++_detailRequestId;
   openDetailSkeleton();
   try {
     const card = await Scryfall.getByName(name);
-    if (reqId !== _detailRequestId) return; // Stale request
+    if (reqId !== _detailRequestId) return;
     renderCardDetail(card);
   } catch {
     if (reqId !== _detailRequestId) return;
