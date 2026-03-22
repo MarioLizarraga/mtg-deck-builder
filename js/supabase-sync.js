@@ -222,14 +222,18 @@ const SupabaseSync = (() => {
       </div>
     `;
 
-    await Promise.all([loadSharesUI(), loadPendingInvitations(), loadSharedWithMe()]);
+    // Load shares with error handling — don't let failures block the modal
+    try { await loadSharesUI(); } catch (e) { console.error('loadSharesUI:', e); document.getElementById('shares-list').innerHTML = ''; }
+    try { await loadPendingInvitations(); } catch (e) { console.error('loadPending:', e); }
+    try { await loadSharedWithMe(); } catch (e) { console.error('loadSharedWithMe:', e); }
   }
 
   // ── My Outgoing Shares ────────────────────────────────
   async function loadSharesUI() {
     const container = document.getElementById('shares-list');
     if (!container || !sb) return;
-    const { data: shares } = await sb.from('shares').select('*').eq('owner_id', currentUser.id).order('created_at', { ascending: false });
+    const { data: shares, error } = await sb.from('shares').select('*').eq('owner_id', currentUser.id).order('created_at', { ascending: false });
+    if (error) { console.error('Shares query error:', error); container.innerHTML = ''; return; }
     if (!shares || shares.length === 0) { container.innerHTML = '<div style="color:var(--color-text-muted);font-size:.82rem">No active shares.</div>'; return; }
 
     const modeLabels = { readonly: 'Read Only', coown: 'Co-Own' };
@@ -252,9 +256,10 @@ const SupabaseSync = (() => {
   async function loadPendingInvitations() {
     const container = document.getElementById('pending-invitations');
     if (!container || !sb) return;
-    const { data: invitations } = await sb.from('shares').select('*')
+    const { data: invitations, error } = await sb.from('shares').select('*')
       .or(`shared_with_id.eq.${currentUser.id},shared_with_email.eq.${currentUser.email}`)
       .eq('accepted', false);
+    if (error) { console.error('Pending invitations error:', error); container.innerHTML = ''; return; }
     if (!invitations || invitations.length === 0) { container.innerHTML = ''; return; }
 
     const modeLabels = { readonly: 'Read Only', coown: 'Co-Own' };
@@ -279,8 +284,9 @@ const SupabaseSync = (() => {
   async function loadSharedWithMe() {
     const container = document.getElementById('shared-with-me');
     if (!container || !sb) return;
-    const { data: shares } = await sb.from('shares').select('*')
+    const { data: shares, error } = await sb.from('shares').select('*')
       .eq('shared_with_id', currentUser.id).eq('accepted', true);
+    if (error) { console.error('Shared with me error:', error); container.innerHTML = ''; return; }
     if (!shares || shares.length === 0) { container.innerHTML = ''; return; }
 
     const modeLabels = { readonly: 'Read Only', coown: 'Co-Own' };
@@ -318,7 +324,7 @@ const SupabaseSync = (() => {
     if (email === currentUser.email) { errorEl.textContent = "You can't share with yourself."; return; }
 
     const { error } = await sb.from('shares').insert({ owner_id: currentUser.id, shared_with_email: email, mode });
-    if (error) { errorEl.textContent = error.message || 'Failed to share.'; return; }
+    if (error) { errorEl.textContent = error.message || 'Failed to share.'; console.error('Share error:', error); return; }
     errorEl.textContent = '';
     document.getElementById('share-email-input').value = '';
     showToast(`Shared with ${email} (${mode === 'coown' ? 'Co-Own' : 'Read Only'})`, 'success');
