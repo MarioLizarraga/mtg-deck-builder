@@ -21,12 +21,14 @@ const SupabaseSync = (() => {
     sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // Listen for auth state changes
+    let _authHandled = false;
     sb.auth.onAuthStateChange(async (event, session) => {
       currentUser = session?.user || null;
       updateAuthUI();
 
-      // Sync on sign in OR when session is restored on page load
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && currentUser) {
+      // Only handle sync once (INITIAL_SESSION and SIGNED_IN can both fire)
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && currentUser && !_authHandled) {
+        _authHandled = true;
         try {
           await sb.rpc('resolve_pending_shares');
         } catch (e) { /* ignore if function doesn't exist yet */ }
@@ -36,6 +38,7 @@ const SupabaseSync = (() => {
       }
       if (event === 'SIGNED_OUT') {
         currentUser = null;
+        _authHandled = false;
         updateAuthUI();
       }
     });
