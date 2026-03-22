@@ -1486,7 +1486,7 @@ a:hover { color: var(--color-accent-light); }
 
 /* ── Card Detail ──────────────────────────────────────── */
 .card-detail { display: flex; gap: 24px; }
-.card-detail__img { width: 240px; border-radius: var(--radius-md); flex-shrink: 0; }
+.card-detail__img { width: 240px; height: auto; border-radius: var(--radius-md); flex-shrink: 0; object-fit: contain; }
 .card-detail__info { flex: 1; }
 .card-detail__type { color: var(--color-text-muted); font-size: .85rem; margin-bottom: 8px; }
 .card-detail__oracle { color: var(--color-text); font-size: .9rem; line-height: 1.7; margin-bottom: 16px; white-space: pre-wrap; }
