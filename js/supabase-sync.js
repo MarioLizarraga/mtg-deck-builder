@@ -238,23 +238,13 @@ const SupabaseSync = (() => {
   }
 
   async function loadSharesAsync() {
-    const run = async (fn, containerId, retries = 2) => {
-      for (let attempt = 0; attempt <= retries; attempt++) {
-        try {
-          await Promise.race([fn(), new Promise((_, r) => setTimeout(() => r('timeout'), 15000))]);
-          return; // success
-        } catch (e) {
-          console.warn(`${containerId}: attempt ${attempt + 1} failed —`, e);
-          if (attempt === retries) {
-            const el = document.getElementById(containerId);
-            if (el) el.innerHTML = '';
-          }
-        }
-      }
-    };
-    await run(loadSharesUI, 'shares-list');
-    await run(loadPendingInvitations, 'pending-invitations');
-    await run(loadSharedWithMe, 'shared-with-me');
+    // Show loading state
+    const sl = document.getElementById('shares-list');
+    if (sl) sl.innerHTML = '<div style="color:var(--color-text-muted);font-size:.82rem">Loading shares...</div>';
+
+    try { await loadSharesUI(); } catch (e) { console.error('loadSharesUI:', e); if (sl) sl.innerHTML = ''; }
+    try { await loadPendingInvitations(); } catch (e) { console.error('loadPending:', e); }
+    try { await loadSharedWithMe(); } catch (e) { console.error('loadSharedWithMe:', e); }
   }
 
   // ── My Outgoing Shares ────────────────────────────────
@@ -550,16 +540,12 @@ const SupabaseSync = (() => {
   // ═══════════════════════════════════════════════════════
   function debouncedSync() { clearTimeout(_syncDebounce); _syncDebounce = setTimeout(() => fullSync(), 2000); }
 
-  function withTimeout(promise, ms = 15000) {
-    return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), ms))]);
-  }
-
   async function fullSync() {
     if (!sb || !currentUser || _syncing) return;
     _syncing = true;
     setSyncStatus('syncing');
     try {
-      await withTimeout(Promise.all([syncDecks(), syncOwnedCards(), syncSettings()]));
+      await Promise.all([syncDecks(), syncOwnedCards(), syncSettings()]);
       setSyncStatus('synced');
     } catch (err) {
       console.error('Sync error:', err);
