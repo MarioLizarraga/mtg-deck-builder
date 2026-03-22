@@ -7,6 +7,85 @@ let currentDeckId = null;
 let searchTimeout = null;
 let globalSearchTimeout = null;
 
+// ═══════════════════════════════════════════════════════════
+//  TOAST NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════
+function showToast(message, type = 'info', duration = 3000) {
+  const container = document.getElementById('toast-container');
+  const icons = { success: '&#10003;', error: '&#10007;', info: '&#8505;', warning: '&#9888;' };
+  const toast = document.createElement('div');
+  toast.className = `toast toast--${type}`;
+  toast.innerHTML = `
+    <span class="toast__icon">${icons[type] || icons.info}</span>
+    <span>${message}</span>
+    <button class="toast__close" onclick="dismissToast(this.parentElement)">&times;</button>
+  `;
+  container.appendChild(toast);
+  setTimeout(() => dismissToast(toast), duration);
+}
+function dismissToast(el) {
+  if (!el || el.classList.contains('toast--out')) return;
+  el.classList.add('toast--out');
+  setTimeout(() => el.remove(), 200);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CARD HOVER PREVIEW
+// ═══════════════════════════════════════════════════════════
+let _previewTimeout = null;
+function setupCardPreview() {
+  document.addEventListener('mouseover', (e) => {
+    const nameEl = e.target.closest('.deck-card__name');
+    if (!nameEl) return;
+    clearTimeout(_previewTimeout);
+    _previewTimeout = setTimeout(() => {
+      const name = nameEl.textContent.trim();
+      const tooltip = document.getElementById('card-preview-tooltip');
+      const img = tooltip.querySelector('img');
+      // Try to find card image from deck data or search cache
+      let imgUrl = '';
+      const deck = currentDeckId ? Storage.getDeck(currentDeckId) : null;
+      if (deck) {
+        const card = [...deck.cards, ...deck.sideboard].find(c => c.name === name);
+        if (card?.imageUrl) {
+          // Convert small to normal for better preview
+          imgUrl = card.imageUrl.replace('/small/', '/normal/');
+        }
+      }
+      if (!imgUrl) {
+        // Fallback: construct Scryfall URL from name
+        imgUrl = `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}&format=image&version=normal`;
+      }
+      img.src = imgUrl;
+      tooltip.style.display = 'block';
+      positionPreview(e, tooltip);
+    }, 300);
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    const tooltip = document.getElementById('card-preview-tooltip');
+    if (tooltip.style.display === 'block') positionPreview(e, tooltip);
+  });
+
+  document.addEventListener('mouseout', (e) => {
+    const nameEl = e.target.closest('.deck-card__name');
+    if (!nameEl) return;
+    clearTimeout(_previewTimeout);
+    const tooltip = document.getElementById('card-preview-tooltip');
+    tooltip.style.display = 'none';
+  });
+}
+function positionPreview(e, tooltip) {
+  const pad = 16;
+  let x = e.clientX + pad;
+  let y = e.clientY - 60;
+  if (x + 240 > window.innerWidth) x = e.clientX - 240 - pad;
+  if (y + 320 > window.innerHeight) y = window.innerHeight - 330;
+  if (y < 10) y = 10;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top = y + 'px';
+}
+
 // ── Init ─────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const settings = Storage.getSettings();
@@ -19,6 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const validPages = ['dashboard', 'builder', 'meta', 'compare', 'collection'];
   const startPage = validPages.includes(hash) ? hash : 'dashboard';
   navigate(startPage);
+  setupCardPreview();
 
   // Keyboard shortcut: Ctrl+K for card search
   document.addEventListener('keydown', (e) => {
@@ -126,7 +206,7 @@ async function showCardDetail(cardId) {
   const body = document.getElementById('card-detail-body');
   modal.style.display = 'flex';
   title.textContent = 'Loading...';
-  body.innerHTML = '<p class="gsearch__loading">Fetching card data...</p>';
+  body.innerHTML = `<div class="card-detail"><div class="skeleton skeleton-img" style="width:240px;height:340px"></div><div style="flex:1;display:flex;flex-direction:column;gap:8px"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text--short skeleton-text"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div></div></div>`;
 
   try {
     const card = await Scryfall.getById(cardId);
@@ -150,6 +230,16 @@ async function showCardDetail(cardId) {
           <div class="card-detail__row"><span class="card-detail__row-label">Rarity</span><span class="card-detail__row-val" style="text-transform:capitalize">${card.rarity}</span></div>
           <div class="card-detail__row card-detail__price-row"><span class="card-detail__row-label">Price (USD)</span><span class="card-detail__row-val">${Scryfall.formatPrice(price)}</span></div>
           ${card.prices?.usd_foil ? `<div class="card-detail__row"><span class="card-detail__row-label">Foil Price</span><span class="card-detail__row-val" style="color:#c9a86c">$${parseFloat(card.prices.usd_foil).toFixed(2)}</span></div>` : ''}
+          ${card.legalities ? `
+            <div class="card-detail__row">
+              <span class="card-detail__row-label">Legality</span>
+              <span class="card-detail__row-val" style="display:flex;gap:4px;flex-wrap:wrap">
+                ${['standard','pioneer','modern','legacy','commander','pauper'].map(f =>
+                  `<span class="legality-badge legality-badge--${card.legalities[f]}">${f.slice(0,3).toUpperCase()}</span>`
+                ).join('')}
+              </span>
+            </div>
+          ` : ''}
           <div class="card-detail__actions">
             <select id="detail-deck-select" class="deck-info-bar__format">${deckOptions}</select>
             <button class="btn btn--primary btn--sm" onclick="addCardFromDetail('${card.id}')">Add to Deck</button>
@@ -168,7 +258,7 @@ async function addCardFromDetail(cardId) {
   const select = document.getElementById('detail-deck-select');
   const deckId = select?.value;
   if (!deckId) {
-    alert('Create a deck first!');
+    showToast('Create a deck first!', 'warning');
     return;
   }
   const card = window._lastDetailCard;
@@ -427,6 +517,8 @@ function renderBuilder(data) {
         </div>
       </div>
 
+      ${totalCards > 0 ? buildDeckStatsPanel(deck) : ''}
+
       <div class="builder__layout">
         <!-- Search Panel -->
         <div class="builder__search-panel">
@@ -558,6 +650,110 @@ function filterDeckList(query) {
   });
 }
 
+// ═══════════════════════════════════════════════════════════
+//  DECK STATS PANEL (Mana Curve + Color Pie + Legality)
+// ═══════════════════════════════════════════════════════════
+function buildDeckStatsPanel(deck) {
+  const cards = deck.cards || [];
+  if (cards.length === 0) return '';
+
+  // Mana curve data (CMC 0-7+)
+  const curve = [0, 0, 0, 0, 0, 0, 0, 0]; // indices 0-7+
+  cards.forEach(c => {
+    const cmc = Math.min(c.cmc || 0, 7);
+    curve[cmc] += (c.qty || 1);
+  });
+  const maxCurve = Math.max(...curve, 1);
+
+  // Color distribution from mana symbols
+  const colorCounts = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
+  const colorNames = { W: 'White', U: 'Blue', B: 'Black', R: 'Red', G: 'Green', C: 'Colorless' };
+  const colorHex = { W: '#F9FAF4', U: '#0E68AB', B: '#555', R: '#D3202A', G: '#00733E', C: '#AABBCC' };
+  cards.forEach(c => {
+    const symbols = Scryfall.parseMana(c.manaCost);
+    const qty = c.qty || 1;
+    symbols.forEach(s => {
+      if (colorCounts[s] !== undefined) colorCounts[s] += qty;
+      else if (!isNaN(s)) colorCounts.C += parseInt(s) * qty;
+    });
+  });
+  const totalMana = Object.values(colorCounts).reduce((a, b) => a + b, 0) || 1;
+
+  // Build conic gradient for color pie
+  const activeColors = Object.entries(colorCounts).filter(([, v]) => v > 0);
+  let gradientParts = [];
+  let cumPercent = 0;
+  activeColors.forEach(([color, count]) => {
+    const pct = (count / totalMana) * 100;
+    gradientParts.push(`${colorHex[color]} ${cumPercent}% ${cumPercent + pct}%`);
+    cumPercent += pct;
+  });
+  const gradient = gradientParts.length > 0
+    ? `conic-gradient(${gradientParts.join(', ')})`
+    : `conic-gradient(var(--color-border) 0% 100%)`;
+
+  // Card type counts
+  const landCount = cards.filter(c => Scryfall.getCategory(c) === 'Lands').reduce((s, c) => s + (c.qty || 1), 0);
+  const creatureCount = cards.filter(c => Scryfall.getCategory(c) === 'Creatures').reduce((s, c) => s + (c.qty || 1), 0);
+  const spellCount = cards.filter(c => !['Lands', 'Creatures'].includes(Scryfall.getCategory(c))).reduce((s, c) => s + (c.qty || 1), 0);
+  const totalCards = cards.reduce((s, c) => s + (c.qty || 1), 0);
+  const nonLandCards = cards.filter(c => Scryfall.getCategory(c) !== 'Lands');
+  const avgCmc = nonLandCards.length > 0
+    ? (nonLandCards.reduce((s, c) => s + (c.cmc || 0) * (c.qty || 1), 0) / nonLandCards.reduce((s, c) => s + (c.qty || 1), 0)).toFixed(2)
+    : '0';
+
+  // Format legality check
+  const format = deck.format || 'standard';
+  const formatDisplay = format.charAt(0).toUpperCase() + format.slice(1);
+
+  return `
+    <div class="deck-stats">
+      <div class="deck-stats__section">
+        <div class="deck-stats__title">Mana Curve</div>
+        <div class="mana-curve">
+          ${curve.map((count, i) => `
+            <div class="mana-curve__bar-wrap">
+              <span class="mana-curve__count">${count || ''}</span>
+              <div class="mana-curve__bar" style="height:${maxCurve > 0 ? (count / maxCurve) * 60 : 0}px" title="${count} card${count !== 1 ? 's' : ''} at CMC ${i === 7 ? '7+' : i}"></div>
+              <span class="mana-curve__label">${i === 7 ? '7+' : i}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="deck-stats__section">
+        <div class="deck-stats__title">Colors</div>
+        <div class="color-pie">
+          <div class="color-pie__ring" style="background:${gradient}"></div>
+          <div class="color-pie__legend">
+            ${activeColors.map(([color, count]) => `
+              <div class="color-pie__item">
+                <div class="color-pie__dot" style="background:${colorHex[color]}"></div>
+                <span>${colorNames[color]} ${Math.round((count / totalMana) * 100)}%</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="deck-stats__section">
+        <div class="deck-stats__title">Breakdown</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:.82rem;color:var(--color-text)">
+          <span>Creatures: <strong style="color:var(--color-heading)">${creatureCount}</strong></span>
+          <span>Spells: <strong style="color:var(--color-heading)">${spellCount}</strong></span>
+          <span>Lands: <strong style="color:var(--color-heading)">${landCount}</strong></span>
+          <span>Avg CMC: <strong style="color:var(--color-heading)">${avgCmc}</strong></span>
+        </div>
+      </div>
+      <div class="deck-stats__section">
+        <div class="deck-stats__title">Format</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="legality-badge legality-badge--legal">${formatDisplay}</span>
+          <span style="color:var(--color-text-muted);font-size:.75rem">${totalCards} / ${format === 'commander' ? '100' : '60'} cards</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 let currentTypeFilter = '';
 
 function filterSearch(btn, filter) {
@@ -581,7 +777,7 @@ async function builderSearch(query) {
     return;
   }
 
-  resultsContainer.innerHTML = '<p class="gsearch__loading">Searching Scryfall...</p>';
+  resultsContainer.innerHTML = `<div style="padding:8px">${Array(5).fill('<div class="skeleton skeleton-card"></div>').join('')}</div>`;
   try {
     const fullQuery = currentTypeFilter ? `${query} ${currentTypeFilter}` : query;
     const data = await Scryfall.search(fullQuery);
@@ -695,7 +891,7 @@ async function showCardDetailByName(name) {
     const card = await Scryfall.getByName(name);
     showCardDetail(card.id);
   } catch {
-    alert('Card not found.');
+    showToast('Card not found.', 'error');
   }
 }
 
@@ -810,7 +1006,7 @@ function importMetaDeck(index) {
     }));
   }
   Storage.saveDeck(deck);
-  alert(`"${meta.name}" imported! Open it from Deck Builder or Collection.`);
+  showToast(`"${meta.name}" imported! Open it from Deck Builder or Collection.`, 'success', 4000);
   if (currentPage === 'dashboard') renderDashboard();
 }
 
@@ -1330,7 +1526,7 @@ async function searchScryfallForOwned(query) {
     return;
   }
 
-  resultsContainer.innerHTML = '<p class="gsearch__loading">Searching Scryfall...</p>';
+  resultsContainer.innerHTML = `<div style="padding:8px">${Array(4).fill('<div class="skeleton skeleton-card"></div>').join('')}</div>`;
   try {
     const data = await Scryfall.search(query);
     if (!data.data || data.data.length === 0) {
@@ -1646,7 +1842,7 @@ async function importDeckFromText(text, deckName) {
   }
 
   if (mainCards.length === 0 && sideboardCards.length === 0) {
-    alert('No cards found in the file. Expected format:\n1 Card Name\n2 Another Card');
+    showToast('No cards found. Expected format: "1 Card Name" per line.', 'error', 5000);
     return;
   }
 
@@ -1785,9 +1981,9 @@ function restoreAllData(input) {
         updateThemeIcon(settings.theme);
       }
       navigate(currentPage);
-      alert('Backup restored successfully!');
+      showToast('Backup restored successfully!', 'success');
     } catch (err) {
-      alert('Invalid backup file: ' + err.message);
+      showToast('Invalid backup file: ' + err.message, 'error', 5000);
     }
   };
   reader.readAsText(file);
