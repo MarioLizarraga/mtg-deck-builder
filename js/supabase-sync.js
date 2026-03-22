@@ -276,17 +276,24 @@ const SupabaseSync = (() => {
     const container = document.getElementById('pending-invitations');
     if (!container || !sb) return;
     const { data: invitations, error } = await sb.from('shares')
-      .select('*, owner:profiles!shares_owner_id_fkey(email, display_name)')
+      .select('*')
       .or(`shared_with_id.eq.${currentUser.id},shared_with_email.eq.${currentUser.email.toLowerCase()}`)
       .eq('accepted', false);
     if (error) { console.error('Pending invitations error:', error); container.innerHTML = ''; return; }
     if (!invitations || invitations.length === 0) { container.innerHTML = ''; return; }
 
     const modeLabels = { readonly: 'Read Only', coown: 'Co-Own' };
+    // Look up owner emails
+    const ownerIds = [...new Set(invitations.map(i => i.owner_id))];
+    const { data: owners } = await sb.from('profiles').select('id, email, display_name').in('id', ownerIds);
+    const ownerMap = {};
+    (owners || []).forEach(o => { ownerMap[o.id] = o; });
+
     let html = '<div style="color:var(--color-text-muted);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Pending Invitations</div>';
     for (const inv of invitations) {
-      const fromName = inv.owner?.display_name || inv.owner?.email || 'Unknown';
-      const fromEmail = inv.owner?.email || '';
+      const owner = ownerMap[inv.owner_id] || {};
+      const fromName = owner.display_name || owner.email || 'Unknown';
+      const fromEmail = owner.email || '';
       html += `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:rgba(224,192,96,.06);border:1px solid rgba(224,192,96,.2);border-radius:var(--radius-sm);margin-bottom:4px;flex-wrap:wrap;gap:8px">
           <div>
@@ -308,17 +315,24 @@ const SupabaseSync = (() => {
     const container = document.getElementById('shared-with-me');
     if (!container || !sb) return;
     const { data: shares, error } = await sb.from('shares')
-      .select('*, owner:profiles!shares_owner_id_fkey(email, display_name)')
+      .select('*')
       .eq('shared_with_id', currentUser.id).eq('accepted', true);
     if (error) { console.error('Shared with me error:', error); container.innerHTML = ''; return; }
     if (!shares || shares.length === 0) { container.innerHTML = ''; return; }
 
     const modeLabels = { readonly: 'Read Only', coown: 'Co-Own' };
     const modeColors = { readonly: '#6bcf8e', coown: '#6cabcf' };
+    // Look up owner emails
+    const ownerIds = [...new Set(shares.map(s => s.owner_id))];
+    const { data: owners } = await sb.from('profiles').select('id, email, display_name').in('id', ownerIds);
+    const ownerMap = {};
+    (owners || []).forEach(o => { ownerMap[o.id] = o; });
+
     let html = '<div style="color:var(--color-text-muted);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Shared With Me</div>';
     for (const s of shares) {
-      const fromName = s.owner?.display_name || s.owner?.email || 'Unknown';
-      const fromEmail = s.owner?.email || '';
+      const owner = ownerMap[s.owner_id] || {};
+      const fromName = owner.display_name || owner.email || 'Unknown';
+      const fromEmail = owner.email || '';
       html += `
         <div style="padding:10px;background:var(--color-bg-card);border:1px solid var(--color-border);border-left:3px solid ${modeColors[s.mode] || modeColors.readonly};border-radius:var(--radius-sm);margin-bottom:4px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
