@@ -18,7 +18,13 @@ const SupabaseSync = (() => {
       console.warn('Supabase SDK not loaded');
       return;
     }
-    sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        storageKey: 'mtg-auth',
+        lock: false,
+        flowType: 'implicit',
+      }
+    });
 
     // Listen for auth state changes
     let _authHandled = false;
