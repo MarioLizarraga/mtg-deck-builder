@@ -32,19 +32,25 @@ const SupabaseSync = (() => {
       updateAuthUI();
       if (event === 'SIGNED_OUT') { currentUser = null; _coownPartnerId = null; updateAuthUI(); return; }
       if (event === 'SIGNED_IN' && currentUser && !wasLoggedIn) {
+        try {
+          await loadCoownState();
+          await fullSync();
+          if (typeof navigate === 'function') navigate(currentPage);
+        } catch (e) { console.error('Sign-in sync error:', e); }
+      }
+    });
+
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session?.user) {
+        currentUser = session.user;
+        updateAuthUI();
         await loadCoownState();
         await fullSync();
         if (typeof navigate === 'function') navigate(currentPage);
       }
-    });
-
-    const { data: { session } } = await sb.auth.getSession();
-    if (session?.user) {
-      currentUser = session.user;
-      updateAuthUI();
-      await loadCoownState();
-      await fullSync();
-      if (typeof navigate === 'function') navigate(currentPage);
+    } catch (e) {
+      console.error('Init session/sync error:', e);
     }
 
     document.addEventListener('visibilitychange', () => {
@@ -60,15 +66,17 @@ const SupabaseSync = (() => {
   // Check if we're co-owning with someone
   async function loadCoownState() {
     if (!sb || !currentUser) return;
-    // Am I a guest in a co-own relationship?
-    const { data: asGuest } = await sb.from('shares').select('owner_id')
-      .eq('shared_with_id', currentUser.id).eq('mode', 'coown').eq('accepted', true).limit(1);
-    if (asGuest?.length > 0) { _coownPartnerId = asGuest[0].owner_id; return; }
-    // Am I the host in a co-own relationship?
-    const { data: asHost } = await sb.from('shares').select('shared_with_id')
-      .eq('owner_id', currentUser.id).eq('mode', 'coown').eq('accepted', true).limit(1);
-    if (asHost?.length > 0) { _coownPartnerId = null; /* I'm host, use my own ID */ return; }
-    _coownPartnerId = null;
+    try {
+      const { data: asGuest, error } = await sb.from('shares').select('owner_id,mode')
+        .eq('shared_with_id', currentUser.id).eq('accepted', true).limit(10);
+      if (error) { console.error('loadCoownState error:', error); _coownPartnerId = null; return; }
+      const coownGuest = (asGuest || []).find(s => s.mode === 'coown');
+      if (coownGuest) { _coownPartnerId = coownGuest.owner_id; return; }
+      _coownPartnerId = null;
+    } catch (e) {
+      console.error('loadCoownState failed:', e);
+      _coownPartnerId = null;
+    }
   }
 
   function isCoowning() { return !!_coownPartnerId; }
