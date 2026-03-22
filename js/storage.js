@@ -105,33 +105,73 @@ const Storage = (() => {
   }
 
   // ── Owned Cards ────────────────────────────────────────
+  // Owned cards stored as { name: { typeLine, manaCost, setName, setCode, imageUrl, price, colors, cmc } }
+  // Backward compatible: old format was string[] of names
   function getOwnedCards() {
     try {
-      return new Set(JSON.parse(localStorage.getItem(OWNED_KEY)) || []);
+      const raw = JSON.parse(localStorage.getItem(OWNED_KEY)) || [];
+      // Old format: array of strings → convert to Set
+      if (Array.isArray(raw)) {
+        const set = new Set();
+        raw.forEach(item => set.add(typeof item === 'string' ? item : item));
+        return set;
+      }
+      return new Set(Object.keys(raw));
     } catch { return new Set(); }
   }
 
+  function getOwnedCardsRich() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(OWNED_KEY)) || [];
+      // Old format: array of strings → convert to map with empty metadata
+      if (Array.isArray(raw)) {
+        const map = {};
+        raw.forEach(item => {
+          if (typeof item === 'string') map[item] = {};
+        });
+        return map;
+      }
+      return raw;
+    } catch { return {}; }
+  }
+
+  function saveOwnedCardsRich(map) {
+    localStorage.setItem(OWNED_KEY, JSON.stringify(map));
+  }
+
   function saveOwnedCards(owned) {
-    localStorage.setItem(OWNED_KEY, JSON.stringify([...owned]));
+    // Convert Set to rich map, preserving existing metadata
+    const existing = getOwnedCardsRich();
+    const map = {};
+    owned.forEach(name => { map[name] = existing[name] || {}; });
+    saveOwnedCardsRich(map);
   }
 
   function isCardOwned(cardName) {
     return getOwnedCards().has(cardName);
   }
 
-  function toggleCardOwned(cardName) {
-    const owned = getOwnedCards();
-    if (owned.has(cardName)) owned.delete(cardName);
-    else owned.add(cardName);
-    saveOwnedCards(owned);
-    return owned.has(cardName);
+  function toggleCardOwned(cardName, meta) {
+    const map = getOwnedCardsRich();
+    if (map[cardName] !== undefined) {
+      delete map[cardName];
+      saveOwnedCardsRich(map);
+      return false;
+    } else {
+      map[cardName] = meta || {};
+      saveOwnedCardsRich(map);
+      return true;
+    }
   }
 
-  function setCardOwned(cardName, isOwned) {
-    const owned = getOwnedCards();
-    if (isOwned) owned.add(cardName);
-    else owned.delete(cardName);
-    saveOwnedCards(owned);
+  function setCardOwned(cardName, isOwned, meta) {
+    const map = getOwnedCardsRich();
+    if (isOwned) {
+      map[cardName] = meta || map[cardName] || {};
+    } else {
+      delete map[cardName];
+    }
+    saveOwnedCardsRich(map);
   }
 
   function getDeckOwnedCount(deck) {
@@ -154,7 +194,7 @@ const Storage = (() => {
       version: 1,
       exportedAt: new Date().toISOString(),
       decks: getDecks(),
-      ownedCards: [...getOwnedCards()],
+      ownedCards: getOwnedCardsRich(),
       settings: getSettings(),
     };
   }
@@ -162,7 +202,16 @@ const Storage = (() => {
   function importAll(data) {
     if (!data || data.version !== 1) throw new Error('Invalid backup file');
     if (data.decks) saveDecks(data.decks);
-    if (data.ownedCards) saveOwnedCards(new Set(data.ownedCards));
+    if (data.ownedCards) {
+      // Support both old format (string[]) and new format (object map)
+      if (Array.isArray(data.ownedCards)) {
+        const map = {};
+        data.ownedCards.forEach(name => { if (typeof name === 'string') map[name] = {}; });
+        saveOwnedCardsRich(map);
+      } else {
+        saveOwnedCardsRich(data.ownedCards);
+      }
+    }
     if (data.settings) saveSettings(data.settings);
   }
 
@@ -171,7 +220,7 @@ const Storage = (() => {
     addCardToDeck, removeCardFromDeck,
     getDeckTotalCards, getDeckTotalPrice,
     getSettings, saveSettings,
-    getOwnedCards, saveOwnedCards, isCardOwned, toggleCardOwned, setCardOwned, getDeckOwnedCount,
+    getOwnedCards, getOwnedCardsRich, saveOwnedCards, saveOwnedCardsRich, isCardOwned, toggleCardOwned, setCardOwned, getDeckOwnedCount,
     exportAll, importAll,
   };
 })();

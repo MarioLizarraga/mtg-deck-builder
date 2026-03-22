@@ -961,7 +961,7 @@ a:hover { color: var(--color-accent-light); }
 /* ── Owned Section (My Collection) ────────────────────── */
 .owned-section {
   margin-bottom: 32px;
-  padding: 24px;
+  padding: 28px;
   background: var(--color-bg-alt);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -970,59 +970,278 @@ a:hover { color: var(--color-accent-light); }
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 4px;
 }
 .owned-section__header h2 {
   color: var(--color-heading);
-  font-size: 1.3rem;
+  font-size: 1.4rem;
   font-weight: 700;
   margin: 0;
 }
 .owned-section__count {
+  color: var(--color-accent);
+  font-size: .85rem;
+  font-weight: 700;
+  background: rgba(201, 168, 108, .1);
+  padding: 3px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(201, 168, 108, .25);
+}
+.owned-section__subtitle {
   color: var(--color-text-muted);
   font-size: .85rem;
-  background: var(--color-bg-card);
-  padding: 2px 10px;
-  border-radius: 12px;
-  border: 1px solid var(--color-border);
+  margin: 0 0 20px 0;
+  line-height: 1.5;
 }
 .owned-section__search { margin-bottom: 20px; }
-.owned-section__browser { margin-top: 8px; }
-.collection-search__card-price {
+.owned-section__divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 24px 0;
+}
+.owned-section__browser { margin-top: 0; }
+.owned-section__browser-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.owned-section__browser-header h3 {
+  color: var(--color-heading);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0;
+}
+.owned-section__showing {
+  color: var(--color-text-muted);
+  font-size: .8rem;
+}
+.owned-section__controls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.owned-type-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+/* ── Scryfall Search Results (Add to collection) ────── */
+.scryfall-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: all var(--transition);
+}
+.scryfall-result:hover { border-color: var(--color-accent); }
+.scryfall-result--owned { border-left-color: #6bcf8e; }
+.scryfall-result__toggle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition);
+}
+.scryfall-result__toggle:hover { border-color: #6bcf8e; color: #6bcf8e; transform: scale(1.1); }
+.scryfall-result__toggle.owned {
+  background: #6bcf8e;
+  border-color: #6bcf8e;
+  color: #fff;
+}
+.scryfall-result__toggle.owned:hover { background: #cf6b6b; border-color: #cf6b6b; }
+.scryfall-result__img {
+  width: 40px;
+  height: 56px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform var(--transition);
+}
+.scryfall-result__img:hover { transform: scale(1.15); }
+.scryfall-result__details { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.scryfall-result__name { color: var(--color-heading); font-weight: 700; font-size: .9rem; }
+.scryfall-result__meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.scryfall-result__type { color: var(--color-text-muted); font-size: .78rem; }
+.scryfall-result__mana { font-size: .78rem; }
+.scryfall-result__set {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-text-muted);
+  font-size: .75rem;
+}
+.scryfall-result__set-icon {
+  width: 14px;
+  height: 14px;
+  filter: brightness(0) invert(.6);
+}
+.scryfall-result__rarity {
+  text-transform: capitalize;
+  font-weight: 600;
+  font-size: .72rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+.scryfall-result__rarity--common { color: #b8b8cc; }
+.scryfall-result__rarity--uncommon { color: #c0c0c0; }
+.scryfall-result__rarity--rare { color: #c9a86c; }
+.scryfall-result__rarity--mythic { color: #e07030; }
+.scryfall-result__needed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+.scryfall-result__needed-label {
+  color: #e0c060;
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.scryfall-result__needed-deck {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(224, 192, 96, .12);
+  border: 1px solid rgba(224, 192, 96, .3);
+  border-radius: 12px;
+  color: #e0c060;
+  font-size: .72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.scryfall-result__needed-deck:hover {
+  background: rgba(224, 192, 96, .25);
+  border-color: #e0c060;
+}
+.scryfall-result__price {
   color: var(--color-text-muted);
   font-size: .85rem;
   font-weight: 600;
   flex-shrink: 0;
 }
+
+/* ── Owned Cards Browser ─────────────────────────────── */
 .owned-cards-grid {
-  margin-top: 12px;
+  margin-top: 8px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  max-height: 400px;
+  gap: 6px;
+  max-height: 500px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
 }
+.owned-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--color-text-muted);
+}
+.owned-empty__icon { font-size: 2.5rem; margin-bottom: 12px; }
+.owned-empty__title { color: var(--color-heading); font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+.owned-empty__text { font-size: .85rem; line-height: 1.5; }
 .owned-card {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 10px;
   padding: 8px 12px;
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  transition: border-color var(--transition);
+  transition: all var(--transition);
 }
-.owned-card:hover { border-color: var(--color-accent); }
-.owned-card__info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.owned-card:hover { border-color: var(--color-accent); background: rgba(201, 168, 108, .03); }
+.owned-card__img {
+  width: 32px;
+  height: 44px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.owned-card__img-placeholder {
+  width: 32px;
+  height: 44px;
+  border-radius: 3px;
+  background: var(--color-border);
+  flex-shrink: 0;
+}
+.owned-card__info { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.owned-card__top { display: flex; align-items: center; gap: 8px; }
 .owned-card__name {
   color: var(--color-heading);
   font-weight: 600;
   font-size: .88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.owned-card__mana { flex-shrink: 0; font-size: .75rem; }
+.owned-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.owned-card__category {
+  font-size: .7rem;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+.owned-card__category--creatures { color: #6bcf8e; background: rgba(107, 207, 142, .1); }
+.owned-card__category--instants { color: #6cabcf; background: rgba(108, 171, 207, .1); }
+.owned-card__category--sorceries { color: #b06ccf; background: rgba(176, 108, 207, .1); }
+.owned-card__category--enchantments { color: #c9a86c; background: rgba(201, 168, 108, .1); }
+.owned-card__category--artifacts { color: #8899aa; background: rgba(136, 153, 170, .1); }
+.owned-card__category--lands { color: #8B7355; background: rgba(139, 115, 85, .1); }
+.owned-card__category--planeswalkers { color: #e0c992; background: rgba(224, 201, 146, .1); }
+.owned-card__category--battles { color: #cf6b6b; background: rgba(207, 107, 107, .1); }
+.owned-card__category--other { color: #6b6b80; background: rgba(107, 107, 128, .1); }
+.owned-card__set {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-muted);
+  font-size: .72rem;
+}
+.owned-card__set-icon {
+  width: 12px;
+  height: 12px;
+  filter: brightness(0) invert(.6);
+}
+.owned-card__price {
+  color: var(--color-text-muted);
+  font-size: .75rem;
+  font-weight: 600;
 }
 .owned-card__decks {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  margin-top: 1px;
 }
 .owned-card__remove {
   background: none;

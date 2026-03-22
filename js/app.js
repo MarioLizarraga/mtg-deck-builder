@@ -1062,20 +1062,39 @@ function renderCollection() {
         <h2>My Collection</h2>
         <span class="owned-section__count" id="owned-total-count"></span>
       </div>
+      <p class="owned-section__subtitle">Search any Magic card and add it to your collection. Cards needed by your decks are highlighted so you can sort them out physically.</p>
 
       <div class="owned-section__search">
         <div class="collection-search__input-wrap">
           <svg class="collection-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="owned-scryfall-search" class="collection-search__input" placeholder="Search Scryfall to add cards to your collection..." oninput="debouncedOwnedSearch(this.value)">
+          <input type="text" id="owned-scryfall-search" class="collection-search__input" placeholder="Search any card by name, type, set, or text..." oninput="debouncedOwnedSearch(this.value)">
           <button id="owned-scryfall-clear" class="collection-search__clear" onclick="clearOwnedScryfallSearch()" style="display:none">&times;</button>
         </div>
         <div id="owned-scryfall-results" class="collection-search__results"></div>
       </div>
 
+      <div class="owned-section__divider"></div>
+
       <div class="owned-section__browser">
-        <div class="collection-search__input-wrap">
-          <svg class="collection-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="owned-filter-input" class="collection-search__input" placeholder="Filter owned cards..." oninput="filterOwnedCards(this.value)">
+        <div class="owned-section__browser-header">
+          <h3>Owned Cards</h3>
+          <span class="owned-section__showing" id="owned-showing-count"></span>
+        </div>
+        <div class="owned-section__controls">
+          <div class="collection-search__input-wrap" style="flex:1">
+            <svg class="collection-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="owned-filter-input" class="collection-search__input" placeholder="Filter your collection..." oninput="filterOwnedCards(this.value)">
+          </div>
+        </div>
+        <div class="owned-type-filters" id="owned-type-filters">
+          <button class="filter-btn active" onclick="setOwnedTypeFilter(this, '')">All</button>
+          <button class="filter-btn" onclick="setOwnedTypeFilter(this, 'Creatures')">Creatures</button>
+          <button class="filter-btn" onclick="setOwnedTypeFilter(this, 'Instants')">Instants</button>
+          <button class="filter-btn" onclick="setOwnedTypeFilter(this, 'Sorceries')">Sorceries</button>
+          <button class="filter-btn" onclick="setOwnedTypeFilter(this, 'Enchantments')">Enchant</button>
+          <button class="filter-btn" onclick="setOwnedTypeFilter(this, 'Artifacts')">Artifacts</button>
+          <button class="filter-btn" onclick="setOwnedTypeFilter(this, 'Lands')">Lands</button>
+          <button class="filter-btn" onclick="setOwnedTypeFilter(this, 'Planeswalkers')">Planes</button>
         </div>
         <div id="owned-cards-list" class="owned-cards-grid"></div>
       </div>
@@ -1247,9 +1266,33 @@ function clearCollectionSearch() {
 // ═══════════════════════════════════════════════════════════
 
 let _ownedSearchTimeout = null;
+let _ownedTypeFilter = '';
+let _ownedScryfallCache = {}; // cardId → card data for toggle
+
 function debouncedOwnedSearch(query) {
   clearTimeout(_ownedSearchTimeout);
   _ownedSearchTimeout = setTimeout(() => searchScryfallForOwned(query), 350);
+}
+
+// Build a map of cardName → [{ deckName, deckId, qty, zone }] for all decks
+function buildDeckNeedMap() {
+  const decks = Storage.getDecks();
+  const map = {};
+  decks.forEach(deck => {
+    deck.cards.forEach(c => {
+      if (!map[c.name]) map[c.name] = [];
+      map[c.name].push({ deckName: deck.name, deckId: deck.id, qty: c.qty, zone: 'Main' });
+    });
+    deck.sideboard.forEach(c => {
+      if (!map[c.name]) map[c.name] = [];
+      map[c.name].push({ deckName: deck.name, deckId: deck.id, qty: c.qty, zone: 'Side' });
+    });
+  });
+  return map;
+}
+
+function getSetIconUrl(setCode) {
+  return `https://svgs.scryfall.io/sets/${setCode}.svg`;
 }
 
 async function searchScryfallForOwned(query) {
@@ -1272,20 +1315,47 @@ async function searchScryfallForOwned(query) {
       resultsContainer.innerHTML = '<div class="collection-search__empty">No cards found.</div>';
       return;
     }
-    resultsContainer.innerHTML = data.data.slice(0, 20).map(card => {
+
+    const deckNeedMap = buildDeckNeedMap();
+    _ownedScryfallCache = {};
+    data.data.slice(0, 25).forEach(c => { _ownedScryfallCache[c.id] = c; });
+
+    resultsContainer.innerHTML = data.data.slice(0, 25).map(card => {
       const escapedName = card.name.replace(/'/g, "\\'");
       const isOwned = Storage.isCardOwned(card.name);
+      const neededIn = deckNeedMap[card.name] || [];
+      const setName = card.set_name || '';
+      const setCode = (card.set || '').toLowerCase();
+
       return `
-        <div class="collection-search__card ${isOwned ? '' : 'collection-search__card--missing'}">
-          <div class="collection-search__card-info">
-            <div class="collection-search__owned ${isOwned ? 'owned' : ''}" onclick="event.stopPropagation(); toggleScryfallOwned('${escapedName}')" title="${isOwned ? 'Owned — click to unmark' : 'Click to mark as owned'}">&#10003;</div>
-            <img class="collection-search__card-img" src="${Scryfall.getSmallImage(card)}" alt="" loading="lazy">
-            <div>
-              <div class="collection-search__card-name">${card.name}</div>
-              <div class="collection-search__card-type">${card.type_line || ''}${card.mana_cost ? ' · ' + Scryfall.renderMana(card.mana_cost) : ''}</div>
-            </div>
+        <div class="scryfall-result ${isOwned ? 'scryfall-result--owned' : ''}">
+          <div class="scryfall-result__toggle ${isOwned ? 'owned' : ''}" onclick="event.stopPropagation(); toggleScryfallOwned('${card.id}')" title="${isOwned ? 'Remove from collection' : 'Add to collection'}">
+            ${isOwned ? '&#10003;' : '+'}
           </div>
-          <span class="collection-search__card-price">${Scryfall.formatPrice(Scryfall.getPrice(card))}</span>
+          <img class="scryfall-result__img" src="${Scryfall.getSmallImage(card)}" alt="" loading="lazy" onclick="showCardDetailByName('${escapedName}')">
+          <div class="scryfall-result__details">
+            <div class="scryfall-result__name">${card.name}</div>
+            <div class="scryfall-result__meta">
+              <span class="scryfall-result__type">${card.type_line || ''}</span>
+              ${card.mana_cost ? '<span class="scryfall-result__mana">' + Scryfall.renderMana(card.mana_cost) + '</span>' : ''}
+            </div>
+            <div class="scryfall-result__set">
+              <img class="scryfall-result__set-icon" src="${getSetIconUrl(setCode)}" alt="${setCode}" onerror="this.style.display='none'">
+              <span>${setName}</span>
+              <span class="scryfall-result__rarity scryfall-result__rarity--${(card.rarity || '').toLowerCase()}">${card.rarity || ''}</span>
+            </div>
+            ${neededIn.length > 0 ? `
+              <div class="scryfall-result__needed">
+                <span class="scryfall-result__needed-label">Needed in:</span>
+                ${neededIn.map(d => `
+                  <span class="scryfall-result__needed-deck" onclick="event.stopPropagation(); navigate('builder', { deckId: '${d.deckId}' })">
+                    ${d.deckName} <span class="collection-search__deck-qty">${d.qty}x</span>
+                  </span>
+                `).join('')}
+              </div>
+            ` : ''}
+          </div>
+          <span class="scryfall-result__price">${Scryfall.formatPrice(Scryfall.getPrice(card))}</span>
         </div>
       `;
     }).join('');
@@ -1294,8 +1364,25 @@ async function searchScryfallForOwned(query) {
   }
 }
 
-function toggleScryfallOwned(cardName) {
-  Storage.toggleCardOwned(cardName);
+function cardMetaFromScryfall(card) {
+  return {
+    typeLine: card.type_line || '',
+    manaCost: card.mana_cost || (card.card_faces?.[0]?.mana_cost) || '',
+    setName: card.set_name || '',
+    setCode: (card.set || '').toLowerCase(),
+    rarity: card.rarity || '',
+    imageUrl: Scryfall.getSmallImage(card),
+    price: Scryfall.getPrice(card),
+    colors: card.colors || card.color_identity || [],
+    cmc: card.cmc || 0,
+  };
+}
+
+function toggleScryfallOwned(cardId) {
+  const card = _ownedScryfallCache[cardId];
+  if (!card) return;
+  const meta = cardMetaFromScryfall(card);
+  Storage.toggleCardOwned(card.name, meta);
   // Re-render scryfall results in place
   const input = document.getElementById('owned-scryfall-search');
   if (input && input.value) searchScryfallForOwned(input.value);
@@ -1312,47 +1399,102 @@ function clearOwnedScryfallSearch() {
   if (clearBtn) clearBtn.style.display = 'none';
 }
 
-function renderOwnedCardsList(filter = '') {
+function setOwnedTypeFilter(btn, type) {
+  document.querySelectorAll('#owned-type-filters .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _ownedTypeFilter = type;
+  renderOwnedCardsList();
+}
+
+function getTypeCategory(typeLine) {
+  const t = (typeLine || '').toLowerCase();
+  if (t.includes('creature')) return 'Creatures';
+  if (t.includes('planeswalker')) return 'Planeswalkers';
+  if (t.includes('battle')) return 'Battles';
+  if (t.includes('instant')) return 'Instants';
+  if (t.includes('sorcery')) return 'Sorceries';
+  if (t.includes('enchantment')) return 'Enchantments';
+  if (t.includes('artifact')) return 'Artifacts';
+  if (t.includes('land')) return 'Lands';
+  return 'Other';
+}
+
+function renderOwnedCardsList() {
   const container = document.getElementById('owned-cards-list');
   const countEl = document.getElementById('owned-total-count');
+  const showingEl = document.getElementById('owned-showing-count');
   if (!container) return;
 
-  const owned = [...Storage.getOwnedCards()].sort((a, b) => a.localeCompare(b));
-  if (countEl) countEl.textContent = `${owned.length} card${owned.length !== 1 ? 's' : ''}`;
+  const richMap = Storage.getOwnedCardsRich();
+  const allNames = Object.keys(richMap).sort((a, b) => a.localeCompare(b));
+  if (countEl) countEl.textContent = `${allNames.length} card${allNames.length !== 1 ? 's' : ''}`;
 
-  if (owned.length === 0) {
-    container.innerHTML = '<div class="collection-search__empty">No owned cards yet. Use the search above to find and mark cards you own.</div>';
+  if (allNames.length === 0) {
+    container.innerHTML = `
+      <div class="owned-empty">
+        <div class="owned-empty__icon">&#x1F4E6;</div>
+        <div class="owned-empty__title">Your collection is empty</div>
+        <div class="owned-empty__text">Use the search bar above to find cards and add them to your collection.</div>
+      </div>
+    `;
+    if (showingEl) showingEl.textContent = '';
     return;
   }
 
-  const filtered = filter ? owned.filter(name => name.toLowerCase().includes(filter.toLowerCase())) : owned;
+  const filter = (document.getElementById('owned-filter-input')?.value || '').trim().toLowerCase();
+
+  let filtered = allNames;
+  if (filter) {
+    filtered = filtered.filter(name => {
+      const meta = richMap[name] || {};
+      return name.toLowerCase().includes(filter)
+        || (meta.typeLine || '').toLowerCase().includes(filter)
+        || (meta.setName || '').toLowerCase().includes(filter);
+    });
+  }
+  if (_ownedTypeFilter) {
+    filtered = filtered.filter(name => {
+      const meta = richMap[name] || {};
+      return getTypeCategory(meta.typeLine) === _ownedTypeFilter;
+    });
+  }
+
+  if (showingEl) {
+    showingEl.textContent = filtered.length === allNames.length ? '' : `Showing ${filtered.length} of ${allNames.length}`;
+  }
 
   if (filtered.length === 0) {
-    container.innerHTML = `<div class="collection-search__empty">No owned cards matching "${filter}"</div>`;
+    container.innerHTML = `<div class="collection-search__empty">No cards match your filter.</div>`;
     return;
   }
 
-  // Find which decks each owned card appears in
-  const decks = Storage.getDecks();
-  const deckMap = {};
-  decks.forEach(deck => {
-    deck.cards.forEach(c => {
-      if (!deckMap[c.name]) deckMap[c.name] = [];
-      deckMap[c.name].push({ deckName: deck.name, deckId: deck.id, qty: c.qty, zone: 'Main' });
-    });
-    deck.sideboard.forEach(c => {
-      if (!deckMap[c.name]) deckMap[c.name] = [];
-      deckMap[c.name].push({ deckName: deck.name, deckId: deck.id, qty: c.qty, zone: 'Side' });
-    });
-  });
+  const deckNeedMap = buildDeckNeedMap();
 
   container.innerHTML = filtered.map(name => {
+    const meta = richMap[name] || {};
     const escapedName = name.replace(/'/g, "\\'");
-    const inDecks = deckMap[name] || [];
+    const inDecks = deckNeedMap[name] || [];
+    const setCode = (meta.setCode || '').toLowerCase();
+    const category = getTypeCategory(meta.typeLine);
+
     return `
       <div class="owned-card">
+        ${meta.imageUrl ? `<img class="owned-card__img" src="${meta.imageUrl}" alt="" loading="lazy" onclick="showCardDetailByName('${escapedName}')">` : '<div class="owned-card__img-placeholder"></div>'}
         <div class="owned-card__info">
-          <div class="owned-card__name">${name}</div>
+          <div class="owned-card__top">
+            <div class="owned-card__name">${name}</div>
+            ${meta.manaCost ? '<span class="owned-card__mana">' + Scryfall.renderMana(meta.manaCost) + '</span>' : ''}
+          </div>
+          <div class="owned-card__meta">
+            <span class="owned-card__category owned-card__category--${category.toLowerCase()}">${category}</span>
+            ${meta.setName ? `
+              <span class="owned-card__set">
+                <img class="owned-card__set-icon" src="${getSetIconUrl(setCode)}" alt="" onerror="this.style.display='none'">
+                ${meta.setName}
+              </span>
+            ` : ''}
+            ${meta.price ? `<span class="owned-card__price">$${parseFloat(meta.price).toFixed(2)}</span>` : ''}
+          </div>
           ${inDecks.length > 0 ? `
             <div class="owned-card__decks">
               ${inDecks.map(d => `
@@ -1370,12 +1512,12 @@ function renderOwnedCardsList(filter = '') {
 }
 
 function filterOwnedCards(query) {
-  renderOwnedCardsList(query);
+  renderOwnedCardsList();
 }
 
 function removeOwnedCard(cardName) {
   Storage.setCardOwned(cardName, false);
-  renderOwnedCardsList(document.getElementById('owned-filter-input')?.value || '');
+  renderOwnedCardsList();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1561,7 +1703,8 @@ function restoreAllData(input) {
   reader.onload = (e) => {
     try {
       const data = JSON.parse(e.target.result);
-      if (!confirm(`Restore backup from ${data.exportedAt || 'unknown date'}?\n\nThis contains ${(data.decks || []).length} deck(s) and ${(data.ownedCards || []).length} owned card(s).\n\nThis will REPLACE all current data.`)) return;
+      const ownedCount = Array.isArray(data.ownedCards) ? data.ownedCards.length : Object.keys(data.ownedCards || {}).length;
+      if (!confirm(`Restore backup from ${data.exportedAt || 'unknown date'}?\n\nThis contains ${(data.decks || []).length} deck(s) and ${ownedCount} owned card(s).\n\nThis will REPLACE all current data.`)) return;
       Storage.importAll(data);
       // Apply restored theme
       const settings = Storage.getSettings();
