@@ -262,10 +262,15 @@ const SupabaseSync = (() => {
   }
 
   async function loadSharesAsync() {
-    // Show loading state
     const sl = document.getElementById('shares-list');
-    if (sl) sl.innerHTML = '<div style="color:var(--color-text-muted);font-size:.82rem">Loading shares...</div>';
 
+    // Wait for any active sync to finish first (wakes the database)
+    if (_syncing) {
+      if (sl) sl.innerHTML = '<div style="color:var(--color-text-muted);font-size:.82rem">Waiting for sync...</div>';
+      while (_syncing) await new Promise(r => setTimeout(r, 500));
+    }
+
+    if (sl) sl.innerHTML = '';
     try { await loadSharesUI(); } catch (e) { console.error('loadSharesUI:', e); if (sl) sl.innerHTML = ''; }
     try { await loadPendingInvitations(); } catch (e) { console.error('loadPending:', e); }
     try { await loadSharedWithMe(); } catch (e) { console.error('loadSharedWithMe:', e); }
