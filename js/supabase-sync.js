@@ -277,7 +277,7 @@ const SupabaseSync = (() => {
     if (!container || !sb) return;
     const { data: invitations, error } = await sb.from('shares')
       .select('*, owner:profiles!shares_owner_id_fkey(email, display_name)')
-      .or(`shared_with_id.eq.${currentUser.id},shared_with_email.eq.${currentUser.email}`)
+      .or(`shared_with_id.eq.${currentUser.id},shared_with_email.eq.${currentUser.email.toLowerCase()}`)
       .eq('accepted', false);
     if (error) { console.error('Pending invitations error:', error); container.innerHTML = ''; return; }
     if (!invitations || invitations.length === 0) { container.innerHTML = ''; return; }
@@ -351,7 +351,7 @@ const SupabaseSync = (() => {
     if (email === currentUser.email) { errorEl.textContent = "You can't share with yourself."; return; }
 
     try {
-      const { error } = await sb.from('shares').insert({ owner_id: currentUser.id, shared_with_email: email, mode });
+      const { error } = await sb.from('shares').insert({ owner_id: currentUser.id, shared_with_email: email.toLowerCase(), mode });
       if (error) { errorEl.textContent = error.message || 'Failed to share.'; console.error('Share error:', error); return; }
       errorEl.textContent = '';
       document.getElementById('share-email-input').value = '';
