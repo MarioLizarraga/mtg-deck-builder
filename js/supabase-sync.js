@@ -23,7 +23,12 @@ const SupabaseSync = (() => {
   async function init() {
     if (typeof supabase === 'undefined') { console.warn('Supabase SDK not loaded'); return; }
     sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: { storageKey: 'mtg-auth', lock: false, flowType: 'implicit' }
+      auth: { storageKey: 'mtg-auth', lock: false, flowType: 'implicit' },
+      global: { fetch: (url, options = {}) => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+        return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeout));
+      }}
     });
 
     sb.auth.onAuthStateChange(async (event, session) => {
@@ -220,7 +225,7 @@ const SupabaseSync = (() => {
       </div>
       <div id="share-error" style="color:#cf6b6b;font-size:.82rem;min-height:18px;margin-bottom:12px"></div>
 
-      <div id="shares-list" style="margin-bottom:16px"><div class="skeleton skeleton-card"></div></div>
+      <div id="shares-list" style="margin-bottom:16px"></div>
       <div id="pending-invitations" style="margin-bottom:16px"></div>
       <div id="shared-with-me" style="margin-bottom:16px"></div>
 
@@ -230,10 +235,23 @@ const SupabaseSync = (() => {
       </div>
     `;
 
-    // Load shares with error handling — don't let failures block the modal
-    try { await loadSharesUI(); } catch (e) { console.error('loadSharesUI:', e); document.getElementById('shares-list').innerHTML = ''; }
-    try { await loadPendingInvitations(); } catch (e) { console.error('loadPending:', e); }
-    try { await loadSharedWithMe(); } catch (e) { console.error('loadSharedWithMe:', e); }
+    // Load shares in background — don't block the modal
+    loadSharesAsync();
+  }
+
+  async function loadSharesAsync() {
+    const run = async (fn, containerId) => {
+      try {
+        await Promise.race([fn(), new Promise((_, r) => setTimeout(() => r('timeout'), 5000))]);
+      } catch (e) {
+        console.error(`${containerId}:`, e);
+        const el = document.getElementById(containerId);
+        if (el) el.innerHTML = '';
+      }
+    };
+    await run(loadSharesUI, 'shares-list');
+    await run(loadPendingInvitations, 'pending-invitations');
+    await run(loadSharedWithMe, 'shared-with-me');
   }
 
   // ── My Outgoing Shares ────────────────────────────────
