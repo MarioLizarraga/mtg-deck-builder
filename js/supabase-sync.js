@@ -13,7 +13,7 @@ const SupabaseSync = (() => {
   let _syncing = false;
   let _syncDebounce = null;
 
-  function init() {
+  async function init() {
     if (typeof supabase === 'undefined') {
       console.warn('Supabase SDK not loaded');
       return;
@@ -27,27 +27,32 @@ const SupabaseSync = (() => {
     });
 
     // Listen for auth state changes
-    let _authHandled = false;
     sb.auth.onAuthStateChange(async (event, session) => {
+      const wasLoggedIn = !!currentUser;
       currentUser = session?.user || null;
       updateAuthUI();
 
-      // Only handle sync once (INITIAL_SESSION and SIGNED_IN can both fire)
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && currentUser && !_authHandled) {
-        _authHandled = true;
-        try {
-          await sb.rpc('resolve_pending_shares');
-        } catch (e) { /* ignore if function doesn't exist yet */ }
-        await fullSync();
-        // Re-render current page with synced data
-        if (typeof navigate === 'function') navigate(currentPage);
-      }
       if (event === 'SIGNED_OUT') {
         currentUser = null;
-        _authHandled = false;
         updateAuthUI();
+        return;
+      }
+
+      // Sync when user signs in fresh (not on every INITIAL_SESSION reload)
+      if (event === 'SIGNED_IN' && currentUser && !wasLoggedIn) {
+        await fullSync();
+        if (typeof navigate === 'function') navigate(currentPage);
       }
     });
+
+    // On init, check for existing session and sync
+    const { data: { session } } = await sb.auth.getSession();
+    if (session?.user) {
+      currentUser = session.user;
+      updateAuthUI();
+      await fullSync();
+      if (typeof navigate === 'function') navigate(currentPage);
+    }
 
     // Sync on tab focus (catch changes from other devices)
     document.addEventListener('visibilitychange', () => {
