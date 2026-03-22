@@ -656,9 +656,7 @@ function renderDeckCard(card, deckId, zone) {
       <span class="deck-card__mana">${Scryfall.renderMana(card.manaCost)}</span>
       <span class="deck-card__price">${card.price ? '$' + parseFloat(card.price).toFixed(2) : '—'}</span>
       <div class="deck-card__actions">
-        <button class="deck-card__btn deck-card__btn--move" onclick="moveCardZone('${deckId}', '${escapedName}', '${zone}')" title="${zone === 'cards' ? 'Move to Sideboard' : 'Move to Main'}">
-          ${zone === 'cards' ? '&#x21E9;' : '&#x21E7;'}
-        </button>
+        <button class="deck-card__btn deck-card__btn--move" onclick="event.stopPropagation(); moveCardZone(\`${deckId}\`, \`${card.name.replace(/`/g, '')}\`, \`${zone}\`)" title="${zone === 'cards' ? 'Move to Sideboard' : 'Move to Main'}">${zone === 'cards' ? 'SB' : 'MD'}</button>
         <button class="deck-card__btn" onclick="addOneMore('${deckId}', '${escapedName}', '${zone}')">+</button>
         <button class="deck-card__btn deck-card__btn--remove" onclick="removeOne('${deckId}', '${escapedName}', '${zone}')">-</button>
       </div>
