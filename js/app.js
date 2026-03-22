@@ -520,7 +520,14 @@ function renderDeckCard(card, deckId, zone) {
 }
 
 function toggleOwned(cardName, deckId) {
-  Storage.toggleCardOwned(cardName);
+  // Get metadata from deck data
+  const deck = Storage.getDeck(deckId);
+  let meta = null;
+  if (deck) {
+    const found = [...deck.cards, ...deck.sideboard].find(c => c.name === cardName);
+    if (found) meta = { typeLine: found.typeLine || '', manaCost: found.manaCost || '', imageUrl: found.imageUrl || '', price: found.price || null, colors: found.colors || [], cmc: found.cmc || 0 };
+  }
+  Storage.toggleCardOwned(cardName, meta);
   renderBuilder({ deckId });
   // Restore filter text after re-render
   const filterInput = document.getElementById('deck-filter-input');
@@ -1250,7 +1257,17 @@ function searchCollectionCards(query) {
 }
 
 function toggleCollectionOwned(cardName) {
-  Storage.toggleCardOwned(cardName);
+  // Try to get metadata from deck data for the card
+  const decks = Storage.getDecks();
+  let meta = null;
+  for (const deck of decks) {
+    const found = [...deck.cards, ...deck.sideboard].find(c => c.name === cardName);
+    if (found) {
+      meta = { typeLine: found.typeLine || '', manaCost: found.manaCost || '', imageUrl: found.imageUrl || '', price: found.price || null, colors: found.colors || [], cmc: found.cmc || 0 };
+      break;
+    }
+  }
+  Storage.toggleCardOwned(cardName, meta);
   const input = document.getElementById('collection-card-search');
   if (input && input.value) searchCollectionCards(input.value);
 }
@@ -1419,13 +1436,45 @@ function getTypeCategory(typeLine) {
   return 'Other';
 }
 
+function enrichOwnedFromDecks(richMap) {
+  // Fill in empty metadata from deck card data
+  const decks = Storage.getDecks();
+  const deckCardMap = {};
+  decks.forEach(deck => {
+    [...deck.cards, ...deck.sideboard].forEach(c => {
+      if (!deckCardMap[c.name]) deckCardMap[c.name] = c;
+    });
+  });
+  let changed = false;
+  for (const name of Object.keys(richMap)) {
+    const meta = richMap[name];
+    if (!meta.typeLine && deckCardMap[name]) {
+      const dc = deckCardMap[name];
+      richMap[name] = {
+        typeLine: dc.typeLine || '',
+        manaCost: dc.manaCost || '',
+        imageUrl: dc.imageUrl || '',
+        price: dc.price || null,
+        colors: dc.colors || [],
+        cmc: dc.cmc || 0,
+        setName: meta.setName || '',
+        setCode: meta.setCode || '',
+        rarity: meta.rarity || '',
+      };
+      changed = true;
+    }
+  }
+  if (changed) Storage.saveOwnedCardsRich(richMap);
+  return richMap;
+}
+
 function renderOwnedCardsList() {
   const container = document.getElementById('owned-cards-list');
   const countEl = document.getElementById('owned-total-count');
   const showingEl = document.getElementById('owned-showing-count');
   if (!container) return;
 
-  const richMap = Storage.getOwnedCardsRich();
+  const richMap = enrichOwnedFromDecks(Storage.getOwnedCardsRich());
   const allNames = Object.keys(richMap).sort((a, b) => a.localeCompare(b));
   if (countEl) countEl.textContent = `${allNames.length} card${allNames.length !== 1 ? 's' : ''}`;
 
