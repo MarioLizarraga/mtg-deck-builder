@@ -1619,9 +1619,9 @@ a:hover { color: var(--color-accent-light); }
   .admin__nav .admin__link { font-size: 0; }
   .admin__nav .admin__link svg { width: 20px; height: 20px; }
   .admin__user-info { display: none; }
-  #auth-user-area .admin__theme-btn { width: 44px; height: 44px; padding: 0; justify-content: center; }
-  #auth-user-area .admin__theme-btn span { display: none; }
-  #auth-user-area .admin__theme-btn svg { width: 20px; height: 20px; }
+  .sync-indicator { display: none !important; }
+  #auth-user-area { overflow: visible; }
+  #auth-user-area .admin__theme-btn { width: 44px; height: 44px; padding: 0; justify-content: center; min-width: 0; }
   .admin__search-trigger span, .admin__search-trigger kbd { display: none; }
   .admin__theme-btn span { display: none; }
   .admin__content { margin-left: 60px; padding: 20px 16px; }

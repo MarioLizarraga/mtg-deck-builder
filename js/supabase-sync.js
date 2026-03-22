@@ -116,9 +116,18 @@ const SupabaseSync = (() => {
 
   async function signOut() {
     if (!sb) return;
-    await sb.auth.signOut();
+    try {
+      await sb.auth.signOut();
+    } catch (e) {
+      console.error('Sign out error:', e);
+    }
+    // Always clear state regardless of API result
     currentUser = null;
+    localStorage.removeItem('mtg-auth');
     updateAuthUI();
+    setSyncStatus('');
+    const syncEl = document.getElementById('sync-status');
+    if (syncEl) syncEl.style.display = 'none';
     showToast('Signed out', 'info');
   }
 
