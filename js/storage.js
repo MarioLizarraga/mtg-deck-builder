@@ -174,6 +174,23 @@ const Storage = (() => {
     saveOwnedCardsRich(map);
   }
 
+  function setOwnedCardQty(cardName, qty) {
+    const map = getOwnedCardsRich();
+    if (map[cardName] === undefined) return;
+    if (qty <= 0) {
+      delete map[cardName];
+    } else {
+      map[cardName].qty = qty;
+    }
+    saveOwnedCardsRich(map);
+  }
+
+  function getOwnedCardQty(cardName) {
+    const map = getOwnedCardsRich();
+    if (map[cardName] === undefined) return 0;
+    return map[cardName].qty || 1;
+  }
+
   function getDeckOwnedCount(deck) {
     const owned = getOwnedCards();
     let have = 0, missing = 0;
@@ -220,7 +237,7 @@ const Storage = (() => {
     addCardToDeck, removeCardFromDeck,
     getDeckTotalCards, getDeckTotalPrice,
     getSettings, saveSettings,
-    getOwnedCards, getOwnedCardsRich, saveOwnedCards, saveOwnedCardsRich, isCardOwned, toggleCardOwned, setCardOwned, getDeckOwnedCount,
+    getOwnedCards, getOwnedCardsRich, saveOwnedCards, saveOwnedCardsRich, isCardOwned, toggleCardOwned, setCardOwned, setOwnedCardQty, getOwnedCardQty, getDeckOwnedCount,
     exportAll, importAll,
   };
 })();

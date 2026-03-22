@@ -14,7 +14,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.documentElement.setAttribute('data-theme', settings.theme);
     updateThemeIcon(settings.theme);
   }
-  navigate('dashboard');
+  // Restore last page from hash, or default to dashboard
+  const hash = location.hash.replace('#', '');
+  const validPages = ['dashboard', 'builder', 'meta', 'compare', 'collection'];
+  const startPage = validPages.includes(hash) ? hash : 'dashboard';
+  navigate(startPage);
 
   // Keyboard shortcut: Ctrl+K for card search
   document.addEventListener('keydown', (e) => {
@@ -35,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Navigation ───────────────────────────────────────────
 function navigate(page, data) {
   currentPage = page;
+  location.hash = page;
 
   // Update active link
   document.querySelectorAll('.admin__link').forEach(link => {
@@ -1476,7 +1481,8 @@ function renderOwnedCardsList() {
 
   const richMap = enrichOwnedFromDecks(Storage.getOwnedCardsRich());
   const allNames = Object.keys(richMap).sort((a, b) => a.localeCompare(b));
-  if (countEl) countEl.textContent = `${allNames.length} card${allNames.length !== 1 ? 's' : ''}`;
+  const totalQty = allNames.reduce((sum, name) => sum + ((richMap[name] || {}).qty || 1), 0);
+  if (countEl) countEl.textContent = `${allNames.length} unique \u00b7 ${totalQty} total`;
 
   if (allNames.length === 0) {
     container.innerHTML = `
@@ -1526,6 +1532,7 @@ function renderOwnedCardsList() {
     const setCode = (meta.setCode || '').toLowerCase();
     const category = getTypeCategory(meta.typeLine);
 
+    const qty = meta.qty || 1;
     return `
       <div class="owned-card">
         ${meta.imageUrl ? `<img class="owned-card__img" src="${meta.imageUrl}" alt="" loading="lazy" onclick="showCardDetailByName('${escapedName}')">` : '<div class="owned-card__img-placeholder"></div>'}
@@ -1554,6 +1561,11 @@ function renderOwnedCardsList() {
             </div>
           ` : ''}
         </div>
+        <div class="owned-card__qty-controls">
+          <button class="owned-card__qty-btn" onclick="changeOwnedQty('${escapedName}', -1)">-</button>
+          <span class="owned-card__qty">${qty}x</span>
+          <button class="owned-card__qty-btn" onclick="changeOwnedQty('${escapedName}', 1)">+</button>
+        </div>
         <button class="owned-card__remove" onclick="removeOwnedCard('${escapedName}')" title="Remove from collection">&times;</button>
       </div>
     `;
@@ -1561,6 +1573,17 @@ function renderOwnedCardsList() {
 }
 
 function filterOwnedCards(query) {
+  renderOwnedCardsList();
+}
+
+function changeOwnedQty(cardName, delta) {
+  const currentQty = Storage.getOwnedCardQty(cardName);
+  const newQty = currentQty + delta;
+  if (newQty <= 0) {
+    Storage.setCardOwned(cardName, false);
+  } else {
+    Storage.setOwnedCardQty(cardName, newQty);
+  }
   renderOwnedCardsList();
 }
 

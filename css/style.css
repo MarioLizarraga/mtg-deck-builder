@@ -1243,6 +1243,36 @@ a:hover { color: var(--color-accent-light); }
   gap: 4px;
   margin-top: 1px;
 }
+.owned-card__qty-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.owned-card__qty-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-alt);
+  color: var(--color-text);
+  font-size: .85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+  padding: 0;
+}
+.owned-card__qty-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.owned-card__qty {
+  color: var(--color-heading);
+  font-weight: 700;
+  font-size: .85rem;
+  min-width: 28px;
+  text-align: center;
+}
 .owned-card__remove {
   background: none;
   border: none;
