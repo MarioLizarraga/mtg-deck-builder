@@ -1503,6 +1503,69 @@ a:hover { color: var(--color-accent-light); }
 }
 .owned-card__remove:hover { color: #cf6b6b; background: rgba(207, 107, 107, .1); }
 
+/* ── Auth Forms ──────────────────────────────────────── */
+.auth-form { max-width: 360px; margin: 0 auto; }
+.auth-form__field { margin-bottom: 14px; }
+.auth-form__field label {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: .78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: 5px;
+}
+.auth-form__input {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-heading);
+  font-size: .9rem;
+  font-family: var(--font-body);
+  transition: border-color var(--transition);
+}
+.auth-form__input::placeholder { color: var(--color-text-muted); }
+.auth-form__input:focus { outline: none; border-color: var(--color-accent); }
+
+/* ── Sync Indicator ─────────────────────────────────── */
+.sync-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  font-size: .7rem;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  margin-bottom: 6px;
+}
+.sync-indicator--synced {
+  color: #6bcf8e;
+  background: rgba(107, 207, 142, .08);
+}
+.sync-indicator--syncing {
+  color: var(--color-accent);
+  background: rgba(201, 168, 108, .08);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.sync-indicator--error {
+  color: #cf6b6b;
+  background: rgba(207, 107, 107, .08);
+}
+.sync-indicator::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+.sync-indicator--synced::before { background: #6bcf8e; }
+.sync-indicator--syncing::before { background: var(--color-accent); }
+.sync-indicator--error::before { background: #cf6b6b; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+
 /* ── Card Detail ──────────────────────────────────────── */
 .card-detail { display: flex; gap: 24px; }
 .card-detail__img { width: 240px; height: auto; border-radius: var(--radius-md); flex-shrink: 0; object-fit: contain; }

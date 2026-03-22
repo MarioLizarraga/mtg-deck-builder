@@ -7,6 +7,10 @@ const Storage = (() => {
   const SETTINGS_KEY = 'mtg_settings';
   const OWNED_KEY = 'mtg_owned_cards';
 
+  // Sync hook — called after each write if set
+  let _onWrite = null;
+  function setWriteHook(fn) { _onWrite = fn; }
+
   function getDecks() {
     try {
       return JSON.parse(localStorage.getItem(DECKS_KEY)) || [];
@@ -27,11 +31,13 @@ const Storage = (() => {
     if (idx >= 0) decks[idx] = deck;
     else decks.push(deck);
     saveDecks(decks);
+    if (_onWrite) _onWrite('deck:save', deck);
     return deck;
   }
 
   function deleteDeck(id) {
     saveDecks(getDecks().filter(d => d.id !== id));
+    if (_onWrite) _onWrite('deck:delete', id);
   }
 
   function createDeck(name = 'New Deck', format = 'standard') {
@@ -102,6 +108,7 @@ const Storage = (() => {
 
   function saveSettings(settings) {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    if (_onWrite) _onWrite('settings:save', settings);
   }
 
   // ── Owned Cards ────────────────────────────────────────
@@ -137,6 +144,7 @@ const Storage = (() => {
 
   function saveOwnedCardsRich(map) {
     localStorage.setItem(OWNED_KEY, JSON.stringify(map));
+    if (_onWrite) _onWrite('owned:save', map);
   }
 
   function saveOwnedCards(owned) {
@@ -233,6 +241,7 @@ const Storage = (() => {
   }
 
   return {
+    setWriteHook,
     getDecks, saveDecks, getDeck, saveDeck, deleteDeck, createDeck,
     addCardToDeck, removeCardFromDeck,
     getDeckTotalCards, getDeckTotalPrice,

@@ -100,6 +100,12 @@ document.addEventListener('DOMContentLoaded', () => {
   navigate(startPage);
   setupCardPreview();
 
+  // Init Supabase sync + auth
+  if (typeof SupabaseSync !== 'undefined') {
+    SupabaseSync.init();
+    Storage.setWriteHook(SupabaseSync.onStorageWrite);
+  }
+
   // Keyboard shortcut: Ctrl+K for card search
   document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
