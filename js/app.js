@@ -656,6 +656,9 @@ function renderDeckCard(card, deckId, zone) {
       <span class="deck-card__mana">${Scryfall.renderMana(card.manaCost)}</span>
       <span class="deck-card__price">${card.price ? '$' + parseFloat(card.price).toFixed(2) : '—'}</span>
       <div class="deck-card__actions">
+        <button class="deck-card__btn deck-card__btn--move" onclick="moveCardZone('${deckId}', '${escapedName}', '${zone}')" title="${zone === 'cards' ? 'Move to Sideboard' : 'Move to Main'}">
+          ${zone === 'cards' ? '&#x21E9;' : '&#x21E7;'}
+        </button>
         <button class="deck-card__btn" onclick="addOneMore('${deckId}', '${escapedName}', '${zone}')">+</button>
         <button class="deck-card__btn deck-card__btn--remove" onclick="removeOne('${deckId}', '${escapedName}', '${zone}')">-</button>
       </div>
@@ -841,7 +844,10 @@ async function builderSearch(query) {
           <div class="search-card__mana">${Scryfall.renderMana(card.mana_cost)}</div>
           <div class="search-card__price">${Scryfall.formatPrice(Scryfall.getPrice(card))}</div>
         </div>
-        <button class="search-card__add" onclick="addCardFromSearch('${card.id}')">+</button>
+        <div class="search-card__actions">
+          <button class="search-card__add" onclick="addCardFromSearch('${card.id}')" title="Add to Main Deck">+</button>
+          <button class="search-card__side" onclick="addCardFromSearch('${card.id}', 'sideboard')" title="Add to Sideboard">SB</button>
+        </div>
       </div>
     `).join('');
 
@@ -878,11 +884,11 @@ async function handleSideboardDrop(event, deckId) {
 }
 
 // ── Deck Actions ─────────────────────────────────────────
-async function addCardFromSearch(cardId) {
+async function addCardFromSearch(cardId, zone = 'cards') {
   if (!currentDeckId) return;
   const card = window._searchResults?.[cardId];
   if (card) {
-    Storage.addCardToDeck(currentDeckId, card, 'cards');
+    Storage.addCardToDeck(currentDeckId, card, zone);
     renderBuilder({ deckId: currentDeckId });
   }
 }
@@ -901,6 +907,29 @@ function addOneMore(deckId, cardName, zone) {
 
 function removeOne(deckId, cardName, zone) {
   Storage.removeCardFromDeck(deckId, cardName, zone);
+  renderBuilder({ deckId });
+}
+
+function moveCardZone(deckId, cardName, fromZone) {
+  const deck = Storage.getDeck(deckId);
+  if (!deck) return;
+  const toZone = fromZone === 'cards' ? 'sideboard' : 'cards';
+  const fromList = deck[fromZone];
+  const idx = fromList.findIndex(c => c.name === cardName);
+  if (idx < 0) return;
+  const card = fromList[idx];
+  // Remove from source
+  fromList.splice(idx, 1);
+  // Add to target (merge qty if already there)
+  const existing = deck[toZone].find(c => c.name === cardName);
+  if (existing) {
+    existing.qty = (existing.qty || 1) + (card.qty || 1);
+  } else {
+    deck[toZone].push(card);
+  }
+  deck.updatedAt = new Date().toISOString();
+  Storage.saveDeck(deck);
+  showToast(`Moved ${cardName} to ${toZone === 'sideboard' ? 'Sideboard' : 'Main Deck'}`, 'info', 2000);
   renderBuilder({ deckId });
 }
 

@@ -673,6 +673,24 @@ a:hover { color: var(--color-accent-light); }
   transition: all var(--transition);
 }
 .search-card__add:hover { background: var(--color-accent); color: var(--color-bg); }
+.search-card__actions { display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; align-self: center; }
+.search-card__side {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  width: 28px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .55rem;
+  font-weight: 700;
+  font-family: var(--font-body);
+  transition: all var(--transition);
+}
+.search-card__side:hover { border-color: #6cabcf; color: #6cabcf; background: rgba(108, 171, 207, .1); }
 
 /* Deck Panel */
 .builder__deck-panel { display: flex; flex-direction: column; gap: 16px; }
@@ -780,6 +798,7 @@ a:hover { color: var(--color-accent-light); }
   font-family: var(--font-body);
 }
 .deck-card__btn:hover { color: var(--color-accent); background: var(--color-accent-glow); }
+.deck-card__btn--move:hover { color: #6cabcf; background: rgba(108, 171, 207, .1); }
 .deck-card__btn--remove:hover { color: #cf6b6b; background: #cf6b6b1a; }
 
 /* ── Owned indicator ──────────────────────────────────── */
