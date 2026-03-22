@@ -362,10 +362,10 @@ a:hover { color: var(--color-accent-light); }
   display: flex;
 }
 .admin__theme-btn:hover { border-color: var(--color-accent); color: var(--color-heading); }
-.admin__user { border-top: 1px solid var(--color-border); align-items: center; gap: 12px; padding-top: 16px; display: flex; }
-.admin__user-info { flex-direction: column; flex: 1; min-width: 0; display: flex; }
-.admin__user-name { color: var(--color-heading); font-size: .85rem; font-weight: 600; }
-.admin__user-role { color: var(--color-accent); text-transform: uppercase; letter-spacing: .08em; font-size: .7rem; font-weight: 600; }
+.admin__user { border-top: 1px solid var(--color-border); gap: 8px; padding-top: 16px; display: flex; flex-direction: column; overflow: hidden; }
+.admin__user-info { flex-direction: column; min-width: 0; display: flex; width: 100%; overflow: hidden; }
+.admin__user-name { color: var(--color-heading); font-size: .85rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin__user-role { color: var(--color-accent); font-size: .7rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .admin__content { flex: 1; margin-left: 240px; padding: 32px; overflow-x: auto; }
 
