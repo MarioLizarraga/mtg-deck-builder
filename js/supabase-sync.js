@@ -351,8 +351,12 @@ const SupabaseSync = (() => {
     if (email === currentUser.email) { errorEl.textContent = "You can't share with yourself."; return; }
 
     try {
-      const { error } = await sb.from('shares').insert({ owner_id: currentUser.id, shared_with_email: email.toLowerCase(), mode });
+      const { data, error } = await sb.from('shares')
+        .insert({ owner_id: currentUser.id, shared_with_email: email.toLowerCase(), mode })
+        .select();
+      console.log('Share insert result:', { data, error });
       if (error) { errorEl.textContent = error.message || 'Failed to share.'; console.error('Share error:', error); return; }
+      if (!data || data.length === 0) { errorEl.textContent = 'Share was blocked — check database permissions.'; return; }
       errorEl.textContent = '';
       document.getElementById('share-email-input').value = '';
       showToast(`Shared with ${email} (${mode === 'coown' ? 'Co-Own' : 'Read Only'})`, 'success');
@@ -545,7 +549,10 @@ const SupabaseSync = (() => {
     _syncing = true;
     setSyncStatus('syncing');
     try {
-      await Promise.all([syncDecks(), syncOwnedCards(), syncSettings()]);
+      await Promise.race([
+        Promise.all([syncDecks(), syncOwnedCards(), syncSettings()]),
+        new Promise((_, r) => setTimeout(() => r(new Error('Sync took too long — try again')), 30000))
+      ]);
       setSyncStatus('synced');
     } catch (err) {
       console.error('Sync error:', err);
