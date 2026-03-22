@@ -370,17 +370,25 @@ const SupabaseSync = (() => {
     _syncDebounce = setTimeout(() => fullSync(), 2000);
   }
 
+  function withTimeout(promise, ms = 15000) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), ms))
+    ]);
+  }
+
   async function fullSync() {
     if (!sb || !currentUser || _syncing) return;
     _syncing = true;
     setSyncStatus('syncing');
 
     try {
-      await Promise.all([syncDecks(), syncOwnedCards(), syncSettings()]);
+      await withTimeout(Promise.all([syncDecks(), syncOwnedCards(), syncSettings()]));
       setSyncStatus('synced');
     } catch (err) {
       console.error('Sync error:', err);
       setSyncStatus('error');
+      showToast('Sync failed: ' + err.message, 'error', 4000);
     }
     _syncing = false;
   }
