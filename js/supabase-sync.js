@@ -280,53 +280,61 @@ const SupabaseSync = (() => {
   async function loadPendingInvitations() {
     const container = document.getElementById('pending-invitations');
     if (!container || !sb) return;
-    const { data: invitations, error } = await sb.from('shares').select('*')
+    const { data: invitations, error } = await sb.from('shares')
+      .select('*, owner:profiles!shares_owner_id_fkey(email, display_name)')
       .or(`shared_with_id.eq.${currentUser.id},shared_with_email.eq.${currentUser.email}`)
       .eq('accepted', false);
     if (error) { console.error('Pending invitations error:', error); container.innerHTML = ''; return; }
     if (!invitations || invitations.length === 0) { container.innerHTML = ''; return; }
 
     const modeLabels = { readonly: 'Read Only', coown: 'Co-Own' };
-    container.innerHTML = `
-      <div style="color:var(--color-text-muted);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Pending Invitations</div>
-      ${invitations.map(inv => `
+    let html = '<div style="color:var(--color-text-muted);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Pending Invitations</div>';
+    for (const inv of invitations) {
+      const fromName = inv.owner?.display_name || inv.owner?.email || 'Unknown';
+      const fromEmail = inv.owner?.email || '';
+      html += `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:rgba(224,192,96,.06);border:1px solid rgba(224,192,96,.2);border-radius:var(--radius-sm);margin-bottom:4px;flex-wrap:wrap;gap:8px">
           <div>
-            <div style="color:var(--color-heading);font-size:.85rem;font-weight:600">${inv.shared_with_email === currentUser.email ? 'Someone' : inv.owner_id.slice(0,8)} wants to share</div>
-            <div style="color:var(--color-text-muted);font-size:.72rem">Mode: <strong style="color:var(--color-accent)">${modeLabels[inv.mode] || 'Read Only'}</strong></div>
+            <div style="color:var(--color-heading);font-size:.85rem;font-weight:600">${fromName}</div>
+            ${fromEmail ? '<div style="color:var(--color-text-muted);font-size:.72rem">' + fromEmail + '</div>' : ''}
+            <div style="color:var(--color-text-muted);font-size:.72rem">Wants to share · <strong style="color:var(--color-accent)">${modeLabels[inv.mode] || 'Read Only'}</strong></div>
           </div>
           <div style="display:flex;gap:6px">
             <button class="btn btn--primary btn--sm" style="padding:4px 14px;font-size:.75rem" onclick="SupabaseSync.acceptShare('${inv.id}', '${inv.mode}')">Accept</button>
             <button class="btn btn--sm" style="color:#cf6b6b;border:1px solid #cf6b6b33;background:transparent;padding:4px 10px;font-size:.75rem" onclick="SupabaseSync.declineShare('${inv.id}')">Decline</button>
           </div>
-        </div>
-      `).join('')}
-    `;
+        </div>`;
+    }
+    container.innerHTML = html;
   }
 
   // ── Shared With Me (accepted shares where I'm the guest) ──
   async function loadSharedWithMe() {
     const container = document.getElementById('shared-with-me');
     if (!container || !sb) return;
-    const { data: shares, error } = await sb.from('shares').select('*')
+    const { data: shares, error } = await sb.from('shares')
+      .select('*, owner:profiles!shares_owner_id_fkey(email, display_name)')
       .eq('shared_with_id', currentUser.id).eq('accepted', true);
     if (error) { console.error('Shared with me error:', error); container.innerHTML = ''; return; }
     if (!shares || shares.length === 0) { container.innerHTML = ''; return; }
 
     const modeLabels = { readonly: 'Read Only', coown: 'Co-Own' };
     const modeColors = { readonly: '#6bcf8e', coown: '#6cabcf' };
-    container.innerHTML = `
-      <div style="color:var(--color-text-muted);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Shared With Me</div>
-      ${shares.map(s => `
+    let html = '<div style="color:var(--color-text-muted);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Shared With Me</div>';
+    for (const s of shares) {
+      const fromName = s.owner?.display_name || s.owner?.email || 'Unknown';
+      const fromEmail = s.owner?.email || '';
+      html += `
         <div style="padding:10px;background:var(--color-bg-card);border:1px solid var(--color-border);border-left:3px solid ${modeColors[s.mode] || modeColors.readonly};border-radius:var(--radius-sm);margin-bottom:4px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
             <div>
-              <div style="color:var(--color-heading);font-size:.85rem;font-weight:600">From: ${s.owner_id === currentUser.id ? 'You' : s.owner_id.slice(0,8)}</div>
+              <div style="color:var(--color-heading);font-size:.85rem;font-weight:600">${fromName}</div>
+              ${fromEmail ? '<div style="color:var(--color-text-muted);font-size:.72rem">' + fromEmail + '</div>' : ''}
               <div style="font-size:.72rem;color:${modeColors[s.mode]};font-weight:600">${modeLabels[s.mode] || 'Read Only'}</div>
             </div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
-            ${s.mode === 'readonly' ? `
+            ${s.mode === 'readonly' || !s.mode ? `
               <button class="btn btn--outline btn--sm" style="padding:4px 12px;font-size:.72rem" onclick="SupabaseSync.viewSharedData('${s.owner_id}')">View Collection</button>
               <button class="btn btn--outline btn--sm" style="padding:4px 12px;font-size:.72rem" onclick="SupabaseSync.syncFromUser('${s.owner_id}')">Copy to My Account</button>
             ` : ''}
@@ -334,9 +342,9 @@ const SupabaseSync = (() => {
               <button class="btn btn--outline btn--sm" style="padding:4px 12px;font-size:.72rem;color:#cf6b6b;border-color:#cf6b6b33" onclick="SupabaseSync.separateCoown('${s.id}', '${s.owner_id}')">Separate & Keep Data</button>
             ` : ''}
           </div>
-        </div>
-      `).join('')}
-    `;
+        </div>`;
+    }
+    container.innerHTML = html;
   }
 
   // ── Share Actions ─────────────────────────────────────
