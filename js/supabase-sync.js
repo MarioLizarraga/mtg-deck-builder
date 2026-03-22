@@ -54,8 +54,20 @@ const SupabaseSync = (() => {
     }
 
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && currentUser) debouncedSync();
+      if (!document.hidden && currentUser) {
+        debouncedSync();
+        // Refresh shares if account modal is open
+        if (document.getElementById('auth-modal')?.style.display === 'flex') {
+          loadSharesAsync();
+        }
+      }
     });
+
+    // Poll for new invitations every 30 seconds
+    setInterval(() => {
+      if (!currentUser || document.hidden) return;
+      checkForNewInvitations();
+    }, 30000);
   }
 
   // The user_id to sync with — own ID or co-owner host's ID
@@ -122,19 +134,16 @@ const SupabaseSync = (() => {
     if (!sb) return { error: 'Not initialized' };
     return await sb.auth.signInWithPassword({ email, password });
   }
-  async function signOut() {
-    // Clear ALL Supabase auth state from localStorage
+  function signOut() {
+    // Clear ALL Supabase auth state from localStorage immediately
     for (const key of Object.keys(localStorage)) {
       if (key.startsWith('mtg-auth') || key.startsWith('sb-')) localStorage.removeItem(key);
     }
     currentUser = null;
     _coownPartnerId = null;
-    try { if (sb) await sb.auth.signOut(); } catch (e) { /* ignore */ }
-    updateAuthUI();
-    const syncEl = document.getElementById('sync-status');
-    if (syncEl) syncEl.style.display = 'none';
-    showToast('Signed out', 'info');
-    setTimeout(() => location.reload(), 500);
+    // Fire and forget — don't await, just reload
+    if (sb) sb.auth.signOut().catch(() => {});
+    location.reload();
   }
   function isLoggedIn() { return !!currentUser; }
   function getUser() { return currentUser; }
@@ -235,6 +244,21 @@ const SupabaseSync = (() => {
 
     // Load shares in background — don't block the modal
     loadSharesAsync();
+  }
+
+  let _lastInvitationCount = -1;
+  async function checkForNewInvitations() {
+    if (!sb || !currentUser) return;
+    try {
+      const { data } = await sb.from('shares').select('id')
+        .or(`shared_with_id.eq.${currentUser.id},shared_with_email.eq.${currentUser.email.toLowerCase()}`)
+        .eq('accepted', false);
+      const count = data?.length || 0;
+      if (_lastInvitationCount >= 0 && count > _lastInvitationCount) {
+        showToast('You have a new sharing invitation!', 'info', 5000);
+      }
+      _lastInvitationCount = count;
+    } catch (e) { /* ignore polling errors */ }
   }
 
   async function loadSharesAsync() {
