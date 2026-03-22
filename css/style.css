@@ -958,6 +958,85 @@ a:hover { color: var(--color-accent-light); }
   font-weight: 400;
 }
 
+/* ── Owned Section (My Collection) ────────────────────── */
+.owned-section {
+  margin-bottom: 32px;
+  padding: 24px;
+  background: var(--color-bg-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+.owned-section__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.owned-section__header h2 {
+  color: var(--color-heading);
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0;
+}
+.owned-section__count {
+  color: var(--color-text-muted);
+  font-size: .85rem;
+  background: var(--color-bg-card);
+  padding: 2px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+}
+.owned-section__search { margin-bottom: 20px; }
+.owned-section__browser { margin-top: 8px; }
+.collection-search__card-price {
+  color: var(--color-text-muted);
+  font-size: .85rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.owned-cards-grid {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.owned-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--transition);
+}
+.owned-card:hover { border-color: var(--color-accent); }
+.owned-card__info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.owned-card__name {
+  color: var(--color-heading);
+  font-weight: 600;
+  font-size: .88rem;
+}
+.owned-card__decks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.owned-card__remove {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+.owned-card__remove:hover { color: #cf6b6b; background: rgba(207, 107, 107, .1); }
+
 /* ── Card Detail ──────────────────────────────────────── */
 .card-detail { display: flex; gap: 24px; }
 .card-detail__img { width: 240px; border-radius: var(--radius-md); flex-shrink: 0; }

@@ -1054,7 +1054,35 @@ function renderCollection() {
 
   container.innerHTML = `
     <div class="collection-header">
-      <h1>My Decks</h1>
+      <h1>Collection</h1>
+    </div>
+
+    <div class="owned-section">
+      <div class="owned-section__header">
+        <h2>My Collection</h2>
+        <span class="owned-section__count" id="owned-total-count"></span>
+      </div>
+
+      <div class="owned-section__search">
+        <div class="collection-search__input-wrap">
+          <svg class="collection-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="owned-scryfall-search" class="collection-search__input" placeholder="Search Scryfall to add cards to your collection..." oninput="debouncedOwnedSearch(this.value)">
+          <button id="owned-scryfall-clear" class="collection-search__clear" onclick="clearOwnedScryfallSearch()" style="display:none">&times;</button>
+        </div>
+        <div id="owned-scryfall-results" class="collection-search__results"></div>
+      </div>
+
+      <div class="owned-section__browser">
+        <div class="collection-search__input-wrap">
+          <svg class="collection-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="owned-filter-input" class="collection-search__input" placeholder="Filter owned cards..." oninput="filterOwnedCards(this.value)">
+        </div>
+        <div id="owned-cards-list" class="owned-cards-grid"></div>
+      </div>
+    </div>
+
+    <div class="collection-header" style="margin-top:32px">
+      <h2>My Decks</h2>
       <div style="display:flex;gap:10px">
         <button class="btn btn--primary btn--sm" onclick="createNewDeckFromCollection()">+ New Deck</button>
         <button class="btn btn--outline btn--sm" onclick="document.getElementById('import-file-collection').click()">Import .txt</button>
@@ -1100,6 +1128,9 @@ function renderCollection() {
       }).join('')}
     </div>
   `;
+
+  // Populate the owned cards browser after render
+  renderOwnedCardsList();
 }
 
 function createNewDeckFromCollection() {
@@ -1209,6 +1240,142 @@ function clearCollectionSearch() {
   const input = document.getElementById('collection-card-search');
   if (input) { input.value = ''; input.focus(); }
   searchCollectionCards('');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  OWNED CARDS — Scryfall Search + Browser
+// ═══════════════════════════════════════════════════════════
+
+let _ownedSearchTimeout = null;
+function debouncedOwnedSearch(query) {
+  clearTimeout(_ownedSearchTimeout);
+  _ownedSearchTimeout = setTimeout(() => searchScryfallForOwned(query), 350);
+}
+
+async function searchScryfallForOwned(query) {
+  const resultsContainer = document.getElementById('owned-scryfall-results');
+  const clearBtn = document.getElementById('owned-scryfall-clear');
+  if (!resultsContainer) return;
+
+  query = query.trim();
+  clearBtn.style.display = query ? 'block' : 'none';
+
+  if (!query || query.length < 2) {
+    resultsContainer.innerHTML = '';
+    return;
+  }
+
+  resultsContainer.innerHTML = '<p class="gsearch__loading">Searching Scryfall...</p>';
+  try {
+    const data = await Scryfall.search(query);
+    if (!data.data || data.data.length === 0) {
+      resultsContainer.innerHTML = '<div class="collection-search__empty">No cards found.</div>';
+      return;
+    }
+    resultsContainer.innerHTML = data.data.slice(0, 20).map(card => {
+      const escapedName = card.name.replace(/'/g, "\\'");
+      const isOwned = Storage.isCardOwned(card.name);
+      return `
+        <div class="collection-search__card ${isOwned ? '' : 'collection-search__card--missing'}">
+          <div class="collection-search__card-info">
+            <div class="collection-search__owned ${isOwned ? 'owned' : ''}" onclick="event.stopPropagation(); toggleScryfallOwned('${escapedName}')" title="${isOwned ? 'Owned — click to unmark' : 'Click to mark as owned'}">&#10003;</div>
+            <img class="collection-search__card-img" src="${Scryfall.getSmallImage(card)}" alt="" loading="lazy">
+            <div>
+              <div class="collection-search__card-name">${card.name}</div>
+              <div class="collection-search__card-type">${card.type_line || ''}${card.mana_cost ? ' · ' + Scryfall.renderMana(card.mana_cost) : ''}</div>
+            </div>
+          </div>
+          <span class="collection-search__card-price">${Scryfall.formatPrice(Scryfall.getPrice(card))}</span>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    resultsContainer.innerHTML = '<div class="collection-search__empty">Search error. Try again.</div>';
+  }
+}
+
+function toggleScryfallOwned(cardName) {
+  Storage.toggleCardOwned(cardName);
+  // Re-render scryfall results in place
+  const input = document.getElementById('owned-scryfall-search');
+  if (input && input.value) searchScryfallForOwned(input.value);
+  // Update owned cards browser
+  renderOwnedCardsList();
+}
+
+function clearOwnedScryfallSearch() {
+  const input = document.getElementById('owned-scryfall-search');
+  if (input) { input.value = ''; input.focus(); }
+  const results = document.getElementById('owned-scryfall-results');
+  if (results) results.innerHTML = '';
+  const clearBtn = document.getElementById('owned-scryfall-clear');
+  if (clearBtn) clearBtn.style.display = 'none';
+}
+
+function renderOwnedCardsList(filter = '') {
+  const container = document.getElementById('owned-cards-list');
+  const countEl = document.getElementById('owned-total-count');
+  if (!container) return;
+
+  const owned = [...Storage.getOwnedCards()].sort((a, b) => a.localeCompare(b));
+  if (countEl) countEl.textContent = `${owned.length} card${owned.length !== 1 ? 's' : ''}`;
+
+  if (owned.length === 0) {
+    container.innerHTML = '<div class="collection-search__empty">No owned cards yet. Use the search above to find and mark cards you own.</div>';
+    return;
+  }
+
+  const filtered = filter ? owned.filter(name => name.toLowerCase().includes(filter.toLowerCase())) : owned;
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div class="collection-search__empty">No owned cards matching "${filter}"</div>`;
+    return;
+  }
+
+  // Find which decks each owned card appears in
+  const decks = Storage.getDecks();
+  const deckMap = {};
+  decks.forEach(deck => {
+    deck.cards.forEach(c => {
+      if (!deckMap[c.name]) deckMap[c.name] = [];
+      deckMap[c.name].push({ deckName: deck.name, deckId: deck.id, qty: c.qty, zone: 'Main' });
+    });
+    deck.sideboard.forEach(c => {
+      if (!deckMap[c.name]) deckMap[c.name] = [];
+      deckMap[c.name].push({ deckName: deck.name, deckId: deck.id, qty: c.qty, zone: 'Side' });
+    });
+  });
+
+  container.innerHTML = filtered.map(name => {
+    const escapedName = name.replace(/'/g, "\\'");
+    const inDecks = deckMap[name] || [];
+    return `
+      <div class="owned-card">
+        <div class="owned-card__info">
+          <div class="owned-card__name">${name}</div>
+          ${inDecks.length > 0 ? `
+            <div class="owned-card__decks">
+              ${inDecks.map(d => `
+                <span class="collection-search__deck-tag" onclick="event.stopPropagation(); navigate('builder', { deckId: '${d.deckId}' })">
+                  ${d.deckName} <span class="collection-search__deck-qty">${d.qty}x ${d.zone}</span>
+                </span>
+              `).join('')}
+            </div>
+          ` : ''}
+        </div>
+        <button class="owned-card__remove" onclick="removeOwnedCard('${escapedName}')" title="Remove from collection">&times;</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterOwnedCards(query) {
+  renderOwnedCardsList(query);
+}
+
+function removeOwnedCard(cardName) {
+  Storage.setCardOwned(cardName, false);
+  renderOwnedCardsList(document.getElementById('owned-filter-input')?.value || '');
 }
 
 // ═══════════════════════════════════════════════════════════
