@@ -405,7 +405,7 @@ const SupabaseSync = (() => {
   async function syncDecks() {
     const localDecks = Storage.getDecks();
     const { data: remoteDecks, error: decksErr } = await sb.from('decks').select('*').eq('user_id', currentUser.id);
-    if (decksErr) { console.error('Sync decks pull error:', decksErr); showToast('Sync error: ' + decksErr.message, 'error'); return; }
+    if (decksErr) throw new Error(decksErr.message);
     const remote = remoteDecks || [];
 
     const remoteMap = {};
@@ -427,7 +427,7 @@ const SupabaseSync = (() => {
           created_at: ld.createdAt,
           updated_at: ld.updatedAt,
         }, { onConflict: 'id,user_id' });
-        if (upsErr) console.error('Deck push error:', ld.name, upsErr);
+        if (upsErr) throw new Error(upsErr.message);
       }
     }
 
@@ -455,7 +455,7 @@ const SupabaseSync = (() => {
   async function syncOwnedCards() {
     const localMap = Storage.getOwnedCardsRich();
     const { data: remoteCards, error: cardsErr } = await sb.from('owned_cards').select('*').eq('user_id', currentUser.id);
-    if (cardsErr) { console.error('Sync owned cards pull error:', cardsErr); showToast('Sync error: ' + cardsErr.message, 'error'); return; }
+    if (cardsErr) throw new Error(cardsErr.message);
     const remote = remoteCards || [];
 
     const remoteMap = {};
@@ -486,7 +486,7 @@ const SupabaseSync = (() => {
       // Batch in chunks of 50
       for (let i = 0; i < toUpsert.length; i += 50) {
         const { error: batchErr } = await sb.from('owned_cards').upsert(toUpsert.slice(i, i + 50), { onConflict: 'user_id,card_name' });
-        if (batchErr) console.error('Owned cards push error:', batchErr);
+        if (batchErr) throw new Error(batchErr.message);
       }
     }
 
