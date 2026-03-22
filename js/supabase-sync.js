@@ -583,8 +583,14 @@ const SupabaseSync = (() => {
     el.style.display = '';
     el.className = 'sync-indicator sync-indicator--' + status;
     const labels = { syncing: 'Syncing...', synced: 'Synced', error: 'Sync error' };
-    el.textContent = labels[status] || '';
     el.title = labels[status] || '';
+    el.innerHTML = `
+      <div class="sync-indicator__label">
+        <span class="sync-indicator__dot"></span>
+        <span>${labels[status] || ''}</span>
+      </div>
+      <div class="sync-indicator__bar"><div class="sync-indicator__fill"></div></div>
+    `;
   }
 
   return {
