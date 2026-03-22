@@ -239,7 +239,22 @@ const SupabaseSync = (() => {
     loadSharesAsync();
   }
 
+  // Test if shares table is accessible
+  async function testSharesTable() {
+    try {
+      const { error } = await sb.from('shares').select('id').limit(1);
+      if (error) { console.error('Shares table not accessible:', error.message); return false; }
+      return true;
+    } catch { return false; }
+  }
+
   async function loadSharesAsync() {
+    const ok = await testSharesTable();
+    if (!ok) {
+      const el = document.getElementById('shares-list');
+      if (el) el.innerHTML = '<div style="color:var(--color-text-muted);font-size:.82rem">Sharing unavailable — check Supabase table setup.</div>';
+      return;
+    }
     const run = async (fn, containerId) => {
       try {
         await Promise.race([fn(), new Promise((_, r) => setTimeout(() => r('timeout'), 5000))]);
@@ -349,12 +364,17 @@ const SupabaseSync = (() => {
     if (!email) { errorEl.textContent = 'Enter an email address.'; return; }
     if (email === currentUser.email) { errorEl.textContent = "You can't share with yourself."; return; }
 
-    const { error } = await sb.from('shares').insert({ owner_id: currentUser.id, shared_with_email: email, mode });
-    if (error) { errorEl.textContent = error.message || 'Failed to share.'; console.error('Share error:', error); return; }
-    errorEl.textContent = '';
-    document.getElementById('share-email-input').value = '';
-    showToast(`Shared with ${email} (${mode === 'coown' ? 'Co-Own' : 'Read Only'})`, 'success');
-    await loadSharesUI();
+    try {
+      const { error } = await sb.from('shares').insert({ owner_id: currentUser.id, shared_with_email: email, mode });
+      if (error) { errorEl.textContent = error.message || 'Failed to share.'; console.error('Share error:', error); return; }
+      errorEl.textContent = '';
+      document.getElementById('share-email-input').value = '';
+      showToast(`Shared with ${email} (${mode === 'coown' ? 'Co-Own' : 'Read Only'})`, 'success');
+      loadSharesAsync();
+    } catch (e) {
+      errorEl.textContent = 'Share failed: ' + e.message;
+      console.error('Share exception:', e);
+    }
   }
 
   async function acceptShare(shareId, mode) {
