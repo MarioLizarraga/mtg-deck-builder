@@ -27,58 +27,69 @@ const SupabaseSync = (() => {
       auth: { storageKey: 'mtg-auth', lock: false, flowType: 'implicit' }
     });
 
-    // Single handler for all auth events — only source of truth
-    let _initSyncDone = false;
+    // Handle sign-out and fresh sign-in only
     sb.auth.onAuthStateChange(async (event, session) => {
       console.log('[Auth]', event, session?.user?.email || 'no user');
-      currentUser = session?.user || null;
-      updateAuthUI();
 
       if (event === 'SIGNED_OUT') {
         currentUser = null;
         _coownPartnerId = null;
-        _initSyncDone = false;
         updateAuthUI();
         return;
       }
 
-      // Sync on any event that gives us a valid session (SIGNED_IN, TOKEN_REFRESHED, INITIAL_SESSION)
-      if (currentUser && !_syncing && !_initSyncDone) {
-        _initSyncDone = true;
-        try {
-          setSyncStatus('syncing');
-          console.log('[Auth] Waking database...');
-          // Wake up the database with a tiny query before doing anything else
-          await sb.from('profiles').select('id').eq('id', currentUser.id).limit(1);
-          console.log('[Auth] Database awake');
+      // Fresh sign-in (not reload) — sync immediately
+      if (event === 'SIGNED_IN' && !currentUser && session?.user) {
+        currentUser = session.user;
+        updateAuthUI();
+        await startSync();
+      }
 
-          try { await loadCoownState(); } catch (e) { console.warn('[Auth] coown check failed:', e); }
-          console.log('[Auth] Co-own state:', _coownPartnerId ? 'guest of ' + _coownPartnerId : 'independent');
-          await fullSync();
-          console.log('[Auth] Sync complete');
-          if (typeof navigate === 'function') navigate(currentPage);
-        } catch (e) {
-          console.error('[Auth] Sync error:', e);
-          _initSyncDone = false;
-        }
+      // Token refresh — just update user
+      if (event === 'TOKEN_REFRESHED' && session?.user) {
+        currentUser = session.user;
       }
     });
+
+    // On reload — get session and sync
+    const { data: { session } } = await sb.auth.getSession();
+    if (session?.user) {
+      currentUser = session.user;
+      updateAuthUI();
+      // Small delay to let the Supabase client finish token refresh
+      setTimeout(() => startSync(), 500);
+    }
 
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && currentUser) {
         debouncedSync();
-        // Refresh shares if account modal is open
         if (document.getElementById('auth-modal')?.style.display === 'flex') {
           loadSharesAsync();
         }
       }
     });
 
-    // Poll for new invitations every 60 seconds (only after first sync completes)
     setInterval(() => {
-      if (!currentUser || document.hidden || _syncing || !_initSyncDone) return;
+      if (!currentUser || document.hidden || _syncing) return;
       checkForNewInvitations();
     }, 60000);
+  }
+
+  async function startSync() {
+    if (_syncing) return;
+    try {
+      setSyncStatus('syncing');
+      console.log('[Auth] Waking database...');
+      await sb.from('profiles').select('id').eq('id', currentUser.id).limit(1);
+      console.log('[Auth] Database awake');
+      try { await loadCoownState(); } catch (e) { console.warn('[Auth] coown check failed:', e); }
+      console.log('[Auth] Co-own state:', _coownPartnerId ? 'guest of ' + _coownPartnerId : 'independent');
+      await fullSync();
+      console.log('[Auth] Sync complete');
+      if (typeof navigate === 'function') navigate(currentPage);
+    } catch (e) {
+      console.error('[Auth] Sync error:', e);
+    }
   }
 
   // The user_id to sync with — own ID or co-owner host's ID
