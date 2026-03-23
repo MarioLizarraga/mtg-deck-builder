@@ -21,7 +21,7 @@ const SupabaseSync = (() => {
   let _suppressHook = false; // Prevent write hooks during sync // If co-owning, this is the host's user_id
 
   // ── Init ──────────────────────────────────────────────
-  async function init() {
+  function init() {
     if (typeof supabase === 'undefined') { console.warn('Supabase SDK not loaded'); return; }
     sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { storageKey: 'mtg-auth', lock: false, flowType: 'implicit' }
@@ -51,14 +51,14 @@ const SupabaseSync = (() => {
       }
     });
 
-    // On reload — get session and sync
-    const { data: { session } } = await sb.auth.getSession();
-    if (session?.user) {
-      currentUser = session.user;
-      updateAuthUI();
-      // Small delay to let the Supabase client finish token refresh
-      setTimeout(() => startSync(), 500);
-    }
+    // On reload — get session and sync in background (non-blocking)
+    sb.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        currentUser = session.user;
+        updateAuthUI();
+        setTimeout(() => startSync(), 500);
+      }
+    }).catch(e => console.error('[Auth] getSession error:', e));
 
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && currentUser) {
@@ -79,9 +79,10 @@ const SupabaseSync = (() => {
     if (_syncing) return;
     try {
       setSyncStatus('syncing');
+      const t0 = Date.now();
       console.log('[Auth] Waking database...');
-      await sb.from('profiles').select('id').eq('id', currentUser.id).limit(1);
-      console.log('[Auth] Database awake');
+      const { error: wakeErr } = await sb.from('profiles').select('id').eq('id', currentUser.id).limit(1);
+      console.log('[Auth] Database awake in', Date.now() - t0, 'ms', wakeErr ? 'ERROR: ' + wakeErr.message : 'OK');
       try { await loadCoownState(); } catch (e) { console.warn('[Auth] coown check failed:', e); }
       console.log('[Auth] Co-own state:', _coownPartnerId ? 'guest of ' + _coownPartnerId : 'independent');
       await fullSync();
