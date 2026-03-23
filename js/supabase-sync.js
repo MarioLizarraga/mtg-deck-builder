@@ -47,13 +47,14 @@ const SupabaseSync = (() => {
         _initSyncDone = true;
         try {
           console.log('[Auth] Starting sync...');
-          await loadCoownState();
+          // Load co-own state in background — don't block sync
+          loadCoownState().catch(e => console.warn('[Auth] coown check failed:', e));
           await fullSync();
           console.log('[Auth] Sync complete');
           if (typeof navigate === 'function') navigate(currentPage);
         } catch (e) {
           console.error('[Auth] Sync error:', e);
-          _initSyncDone = false; // Allow retry
+          _initSyncDone = false;
         }
       }
     });
