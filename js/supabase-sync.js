@@ -630,8 +630,11 @@ const SupabaseSync = (() => {
 
   async function syncDecks() {
     const uid = syncUserId();
+    console.log('[Sync] decks: fetching remote for uid', uid);
     const localDecks = Storage.getDecks();
+    console.log('[Sync] decks: local count', localDecks.length);
     const { data: remoteDecks, error: decksErr } = await sb.from('decks').select('*').eq('user_id', uid);
+    console.log('[Sync] decks: remote response', decksErr ? 'ERROR: ' + decksErr.message : (remoteDecks?.length || 0) + ' decks');
     if (decksErr) throw new Error(decksErr.message);
     const remote = remoteDecks || [];
     const remoteMap = {}; remote.forEach(d => { remoteMap[d.id] = d; });
