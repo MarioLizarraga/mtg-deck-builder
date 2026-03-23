@@ -47,8 +47,15 @@ const SupabaseSync = (() => {
         _initSyncDone = true;
         try {
           console.log('[Auth] Starting sync...');
-          // Load co-own state in background — don't block sync
-          loadCoownState().catch(e => console.warn('[Auth] coown check failed:', e));
+          // Load co-own state first but with a safety timeout
+          // If shares table is cold, skip co-own check and sync as self
+          try {
+            await Promise.race([
+              loadCoownState(),
+              new Promise(r => setTimeout(r, 8000)) // 8s max wait
+            ]);
+          } catch (e) { console.warn('[Auth] coown check failed:', e); }
+          console.log('[Auth] Co-own state:', _coownPartnerId ? 'guest of ' + _coownPartnerId : 'independent');
           await fullSync();
           console.log('[Auth] Sync complete');
           if (typeof navigate === 'function') navigate(currentPage);
@@ -69,16 +76,17 @@ const SupabaseSync = (() => {
       }
     });
 
-    // Poll for new invitations every 30 seconds
+    // Poll for new invitations every 60 seconds (only after first sync completes)
     setInterval(() => {
-      if (!currentUser || document.hidden) return;
+      if (!currentUser || document.hidden || _syncing || !_initSyncDone) return;
       checkForNewInvitations();
-    }, 30000);
+    }, 60000);
   }
 
   // The user_id to sync with — own ID or co-owner host's ID
+  let _activeSyncUid = null;
   function syncUserId() {
-    return _coownPartnerId || currentUser?.id;
+    return _activeSyncUid || _coownPartnerId || currentUser?.id;
   }
 
   // Check if we're co-owning with someone
@@ -597,8 +605,10 @@ const SupabaseSync = (() => {
     if (!sb || !currentUser) { console.log('[Sync] skipped — no client or user'); return; }
     if (_syncing) { console.log('[Sync] skipped — already syncing'); return; }
     _syncing = true;
-    _suppressHook = true; // Don't trigger push-backs while syncing
+    _suppressHook = true;
+    _activeSyncUid = _coownPartnerId || currentUser?.id; // Snapshot uid for this sync
     setSyncStatus('syncing');
+    console.log('[Sync] uid:', _activeSyncUid, _coownPartnerId ? '(co-owning)' : '(own)');
     try {
       console.log('[Sync] starting decks...');
       await syncDecks();
@@ -613,6 +623,7 @@ const SupabaseSync = (() => {
       setSyncStatus('error');
       showToast('Sync failed: ' + err.message, 'error', 4000);
     }
+    _activeSyncUid = null;
     _suppressHook = false;
     _syncing = false;
   }
