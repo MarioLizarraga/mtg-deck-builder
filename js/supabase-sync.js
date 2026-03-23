@@ -38,13 +38,15 @@ const SupabaseSync = (() => {
         return;
       }
 
-      if (session?.user && !_syncing) {
+      if (session?.user) {
+        const wasAlreadySynced = currentUser?._synced;
         currentUser = session.user;
+        currentUser._synced = wasAlreadySynced;
         updateAuthUI();
-        // Only sync once per page load
         if (!currentUser._synced) {
           currentUser._synced = true;
-          await startSync();
+          console.log('[Auth] Starting sync from', event);
+          startSync();
         }
       }
     });
