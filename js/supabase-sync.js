@@ -51,13 +51,27 @@ const SupabaseSync = (() => {
       }
     });
 
-    // On reload — get session and sync in background (non-blocking)
-    sb.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        currentUser = session.user;
-        updateAuthUI();
-        setTimeout(() => startSync(), 500);
+    // On reload — get session, wait for token to be ready, then sync
+    sb.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session?.user) return;
+      currentUser = session.user;
+      updateAuthUI();
+
+      // Wait for a valid token — the client may need to refresh it
+      let retries = 0;
+      while (retries < 5) {
+        const { data: { session: freshSession } } = await sb.auth.getSession();
+        if (freshSession?.access_token) {
+          currentUser = freshSession.user;
+          console.log('[Auth] Token ready after', retries, 'retries');
+          await startSync();
+          return;
+        }
+        retries++;
+        await new Promise(r => setTimeout(r, 1000));
+        console.log('[Auth] Waiting for token...', retries);
       }
+      console.error('[Auth] Could not get valid token');
     }).catch(e => console.error('[Auth] getSession error:', e));
 
     document.addEventListener('visibilitychange', () => {
@@ -79,10 +93,18 @@ const SupabaseSync = (() => {
     if (_syncing) return;
     try {
       setSyncStatus('syncing');
+
+      // Get fresh token
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session?.access_token) { console.error('[Sync] No access token'); setSyncStatus('error'); return; }
+      console.log('[Auth] Token obtained, waking database...');
+
+      // Raw fetch to wake DB — bypasses Supabase client internals
       const t0 = Date.now();
-      console.log('[Auth] Waking database...');
-      const { error: wakeErr } = await sb.from('profiles').select('id').eq('id', currentUser.id).limit(1);
-      console.log('[Auth] Database awake in', Date.now() - t0, 'ms', wakeErr ? 'ERROR: ' + wakeErr.message : 'OK');
+      const wakeResp = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id&id=eq.${currentUser.id}&limit=1`, {
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + session.access_token }
+      });
+      console.log('[Auth] Database awake in', Date.now() - t0, 'ms, status:', wakeResp.status);
       try { await loadCoownState(); } catch (e) { console.warn('[Auth] coown check failed:', e); }
       console.log('[Auth] Co-own state:', _coownPartnerId ? 'guest of ' + _coownPartnerId : 'independent');
       await fullSync();
