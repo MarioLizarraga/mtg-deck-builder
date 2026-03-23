@@ -27,7 +27,7 @@ const SupabaseSync = (() => {
       auth: { storageKey: 'mtg-auth', lock: false, flowType: 'implicit' }
     });
 
-    // Handle sign-out and fresh sign-in only
+    // Single auth handler — works for both fresh sign-in AND reload
     sb.auth.onAuthStateChange(async (event, session) => {
       console.log('[Auth]', event, session?.user?.email || 'no user');
 
@@ -38,41 +38,16 @@ const SupabaseSync = (() => {
         return;
       }
 
-      // Fresh sign-in (not reload) — sync immediately
-      if (event === 'SIGNED_IN' && !currentUser && session?.user) {
+      if (session?.user && !_syncing) {
         currentUser = session.user;
         updateAuthUI();
-        await startSync();
-      }
-
-      // Token refresh — just update user
-      if (event === 'TOKEN_REFRESHED' && session?.user) {
-        currentUser = session.user;
+        // Only sync once per page load
+        if (!currentUser._synced) {
+          currentUser._synced = true;
+          await startSync();
+        }
       }
     });
-
-    // On reload — get session, wait for token to be ready, then sync
-    sb.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session?.user) return;
-      currentUser = session.user;
-      updateAuthUI();
-
-      // Wait for a valid token — the client may need to refresh it
-      let retries = 0;
-      while (retries < 5) {
-        const { data: { session: freshSession } } = await sb.auth.getSession();
-        if (freshSession?.access_token) {
-          currentUser = freshSession.user;
-          console.log('[Auth] Token ready after', retries, 'retries');
-          await startSync();
-          return;
-        }
-        retries++;
-        await new Promise(r => setTimeout(r, 1000));
-        console.log('[Auth] Waiting for token...', retries);
-      }
-      console.error('[Auth] Could not get valid token');
-    }).catch(e => console.error('[Auth] getSession error:', e));
 
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && currentUser) {
