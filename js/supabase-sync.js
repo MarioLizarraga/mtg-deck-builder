@@ -46,15 +46,13 @@ const SupabaseSync = (() => {
       if (currentUser && !_syncing && !_initSyncDone) {
         _initSyncDone = true;
         try {
-          console.log('[Auth] Starting sync...');
-          // Load co-own state first but with a safety timeout
-          // If shares table is cold, skip co-own check and sync as self
-          try {
-            await Promise.race([
-              loadCoownState(),
-              new Promise(r => setTimeout(r, 8000)) // 8s max wait
-            ]);
-          } catch (e) { console.warn('[Auth] coown check failed:', e); }
+          setSyncStatus('syncing');
+          console.log('[Auth] Waking database...');
+          // Wake up the database with a tiny query before doing anything else
+          await sb.from('profiles').select('id').eq('id', currentUser.id).limit(1);
+          console.log('[Auth] Database awake');
+
+          try { await loadCoownState(); } catch (e) { console.warn('[Auth] coown check failed:', e); }
           console.log('[Auth] Co-own state:', _coownPartnerId ? 'guest of ' + _coownPartnerId : 'independent');
           await fullSync();
           console.log('[Auth] Sync complete');
